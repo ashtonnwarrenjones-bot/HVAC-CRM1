@@ -1,0 +1,166 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+const DEFAULTS = {
+  company_name: '',
+  company_phone: '',
+  company_email: '',
+  company_address: '',
+  company_city: '',
+  company_state: '',
+  company_zip: '',
+  company_license: '',
+  proposal_terms: 'Payment due net 30 days. Price valid for 30 days from proposal date. All work performed per manufacturer specifications and local code.',
+  proposal_footer: 'Thank you for the opportunity to earn your business.',
+  tax_rate_default: '0',
+};
+
+export default function Settings() {
+  const [form, setForm] = useState(DEFAULTS);
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    axios.get('/api/settings').then(r => {
+      setForm(f => ({ ...f, ...r.data }));
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const f = (k) => e => setForm(p => ({ ...p, [k]: e.target.value }));
+
+  const save = async () => {
+    await axios.put('/api/settings', form);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  if (loading) return <div className="page-content"><p className="text-muted">Loading...</p></div>;
+
+  return (
+    <>
+      <div className="page-header">
+        <h2>Settings</h2>
+        <button className="btn btn-primary" onClick={save}>
+          {saved ? '✓ Saved!' : 'Save Settings'}
+        </button>
+      </div>
+
+      <div className="page-content">
+        <div className="two-col" style={{ alignItems: 'start' }}>
+
+          {/* Company Info */}
+          <div>
+            <div className="card mb-4">
+              <div className="card-header"><h3>Your Company Info</h3></div>
+              <div className="card-body">
+                <p className="text-muted text-sm mb-4">This appears on all proposal PDFs.</p>
+                <div className="form-group">
+                  <label className="form-label">Company Name</label>
+                  <input className="form-control" value={form.company_name} onChange={f('company_name')} placeholder="Acme HVAC & Plumbing" />
+                </div>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Phone</label>
+                    <input className="form-control" value={form.company_phone} onChange={f('company_phone')} placeholder="(720) 555-0000" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email</label>
+                    <input className="form-control" type="email" value={form.company_email} onChange={f('company_email')} placeholder="service@yourcompany.com" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Street Address</label>
+                  <input className="form-control" value={form.company_address} onChange={f('company_address')} placeholder="123 Industrial Blvd" />
+                </div>
+                <div className="form-grid-3">
+                  <div className="form-group">
+                    <label className="form-label">City</label>
+                    <input className="form-control" value={form.company_city} onChange={f('company_city')} placeholder="Denver" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">State</label>
+                    <input className="form-control" value={form.company_state} onChange={f('company_state')} placeholder="CO" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">ZIP</label>
+                    <input className="form-control" value={form.company_zip} onChange={f('company_zip')} placeholder="80202" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Contractor License #</label>
+                  <input className="form-control" value={form.company_license} onChange={f('company_license')} placeholder="ME-00123 / PC-00456" />
+                </div>
+              </div>
+            </div>
+
+            {/* PDF Preview */}
+            <div className="card">
+              <div className="card-header"><h3>PDF Header Preview</h3></div>
+              <div className="card-body">
+                <div style={{ background: '#1E40AF', color: 'white', borderRadius: 6, padding: '16px 20px' }}>
+                  <div style={{ fontSize: 18, fontWeight: 700 }}>SERVICE PROPOSAL</div>
+                  <div style={{ fontSize: 11, opacity: .8, marginTop: 4 }}>Commercial HVAC & Plumbing Services</div>
+                  <div style={{ fontSize: 11, opacity: .7, marginTop: 2 }}>
+                    {form.company_name || 'Your Company Name'} | {form.company_phone || '(555) 000-0000'} | {form.company_email || 'info@yourcompany.com'}
+                  </div>
+                </div>
+                <p className="text-muted text-sm mt-2">This is how your company info appears at the top of every proposal PDF.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Proposal Defaults */}
+          <div>
+            <div className="card mb-4">
+              <div className="card-header"><h3>Proposal Defaults</h3></div>
+              <div className="card-body">
+                <div className="form-group">
+                  <label className="form-label">Default Tax Rate (%)</label>
+                  <input className="form-control" type="number" step="0.1" min="0" max="30"
+                    value={form.tax_rate_default} onChange={f('tax_rate_default')} placeholder="0" />
+                  <p className="text-muted text-sm mt-1">Applied automatically when creating new proposals. Set 0 if you don't charge tax.</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Default Terms & Conditions</label>
+                  <textarea className="form-control" rows={5}
+                    value={form.proposal_terms} onChange={f('proposal_terms')}
+                    placeholder="Payment terms, warranty info, scope limitations..." />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Proposal Footer Message</label>
+                  <input className="form-control"
+                    value={form.proposal_footer} onChange={f('proposal_footer')}
+                    placeholder="Thank you for the opportunity to earn your business." />
+                  <p className="text-muted text-sm mt-1">Printed at the bottom of every proposal.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header"><h3>About This CRM</h3></div>
+              <div className="card-body">
+                <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+                  <div className="flex justify-between" style={{ padding: '4px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                    <span className="text-muted">Version</span><span>2.0</span>
+                  </div>
+                  <div className="flex justify-between" style={{ padding: '4px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                    <span className="text-muted">Backend</span><span>Node.js + Express + SQLite</span>
+                  </div>
+                  <div className="flex justify-between" style={{ padding: '4px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                    <span className="text-muted">Frontend</span><span>React 18 + Vite</span>
+                  </div>
+                  <div className="flex justify-between" style={{ padding: '4px 0' }}>
+                    <span className="text-muted">Database</span><span>crm.db (SQLite)</span>
+                  </div>
+                </div>
+                <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--blue-50)', borderRadius: 6, fontSize: 12, color: 'var(--blue-700)' }}>
+                  💾 Back up your data by copying <strong>backend/crm.db</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
