@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 const STATUS_COLORS = {
   draft: 'badge-gray', sent: 'badge-blue', accepted: 'badge-green', declined: 'badge-red',
@@ -23,18 +23,51 @@ export default function Proposals() {
   const [companies, setCompanies] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [lineItems, setLineItems] = useState([{ ...EMPTY_ITEM }]);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const load = () => axios.get('/api/proposals').then(r => setProposals(r.data));
   useEffect(() => {
     load();
     axios.get('/api/companies').then(r => setCompanies(r.data));
   }, []);
+
+  // Auto-open edit modal if navigated from ProposalDetail with editId
+  useEffect(() => {
+    if (location.state?.editId) {
+      axios.get(`/api/proposals/${location.state.editId}`).then(async ({ data }) => {
+        setForm({
+          company_id: String(data.company_id || ''),
+          contact_id: String(data.contact_id || ''),
+          title: data.title || '',
+          service_type: data.service_type || 'Preventive Maintenance',
+          tax_rate: String(data.tax_rate || '0'),
+          valid_days: String(data.valid_days || '30'),
+          notes: data.notes || '',
+          terms: data.terms || EMPTY_FORM.terms,
+        });
+        if (data.company_id) {
+          const cr = await axios.get('/api/contacts', { params: { company_id: data.company_id } });
+          setContacts(cr.data);
+        }
+        setLineItems((data.line_items || []).map(i => ({
+          description: i.description || '',
+          quantity: String(i.quantity || 1),
+          unit: i.unit || 'ea',
+          unit_price: String(i.unit_price || 0),
+        })));
+        setEditId(location.state.editId);
+        setShowModal(true);
+        navigate('/proposals', { replace: true, state: {} });
+      });
+    }
+  }, [location.state]);
 
   // Load contacts when company changes
   useEffect(() => {
@@ -94,6 +127,32 @@ export default function Proposals() {
     }
   };
 
+  const openEdit = async (p) => {
+    const { data } = await axios.get(`/api/proposals/${p.id}`);
+    setForm({
+      company_id: String(data.company_id || ''),
+      contact_id: String(data.contact_id || ''),
+      title: data.title || '',
+      service_type: data.service_type || 'Preventive Maintenance',
+      tax_rate: String(data.tax_rate || '0'),
+      valid_days: String(data.valid_days || '30'),
+      notes: data.notes || '',
+      terms: data.terms || EMPTY_FORM.terms,
+    });
+    if (data.company_id) {
+      const cr = await axios.get('/api/contacts', { params: { company_id: data.company_id } });
+      setContacts(cr.data);
+    }
+    setLineItems((data.line_items || []).map(i => ({
+      description: i.description || '',
+      quantity: String(i.quantity || 1),
+      unit: i.unit || 'ea',
+      unit_price: String(i.unit_price || 0),
+    })));
+    setEditId(p.id);
+    setShowModal(true);
+  };
+
   const save = async () => {
     if (!form.title.trim()) { alert('Proposal title is required'); return; }
     const payload = {
@@ -105,11 +164,20 @@ export default function Proposals() {
         unit_price: parseFloat(i.unit_price) || 0
       })).filter(i => i.description.trim())
     };
-    const { data } = await axios.post('/api/proposals', payload);
-    setShowModal(false);
-    setForm(EMPTY_FORM);
-    setLineItems([{ ...EMPTY_ITEM }]);
-    navigate(`/proposals/${data.id}`);
+    if (editId) {
+      await axios.put(`/api/proposals/${editId}`, payload);
+      setShowModal(false);
+      setEditId(null);
+      setForm(EMPTY_FORM);
+      setLineItems([{ ...EMPTY_ITEM }]);
+      load();
+    } else {
+      const { data } = await axios.post('/api/proposals', payload);
+      setShowModal(false);
+      setForm(EMPTY_FORM);
+      setLineItems([{ ...EMPTY_ITEM }]);
+      navigate(`/proposals/${data.id}`);
+    }
   };
 
   const del = async (id) => {
@@ -122,7 +190,7 @@ export default function Proposals() {
     <>
       <div className="page-header">
         <h2>Proposals</h2>
-        <button className="btn btn-primary" onClick={() => { setForm(EMPTY_FORM); setLineItems([{ ...EMPTY_ITEM }]); setShowModal(true); }}>
+        <button className="btn btn-primary" onClick={() => { setEditId(null); setForm(EMPTY_FORM); setLineItems([{ ...EMPTY_ITEM }]); setShowModal(true); }}>
           + New Proposal
         </button>
       </div>
@@ -171,6 +239,7 @@ export default function Proposals() {
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <Link to={`/proposals/${p.id}`} className="btn btn-secondary btn-sm">View</Link>
+                          <button className="btn btn-secondary btn-sm" onClick={() => openEdit(p)}>Edit</button>
                           <a href={`/api/proposals/${p.id}/pdf`} className="btn btn-secondary btn-sm" target="_blank" rel="noreferrer">PDF</a>
                           <button className="btn btn-danger btn-sm" onClick={() => del(p.id)}>Del</button>
                         </div>
@@ -189,7 +258,7 @@ export default function Proposals() {
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal modal-lg" style={{ maxWidth: 900 }}>
             <div className="modal-header">
-              <h3>New Proposal</h3>
+              <h3>{editId ? 'Edit Proposal' : 'New Proposal'}</h3>
               <button className="btn btn-ghost" onClick={() => setShowModal(false)}>✕</button>
             </div>
             <div className="modal-body">
@@ -300,8 +369,8 @@ export default function Proposals() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={save}>Create Proposal</button>
+              <button className="btn btn-secondary" onClick={() => { setShowModal(false); setEditId(null); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={save}>{editId ? 'Save Changes' : 'Create Proposal'}</button>
             </div>
           </div>
         </div>

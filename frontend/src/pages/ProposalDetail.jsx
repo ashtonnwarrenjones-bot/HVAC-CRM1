@@ -117,6 +117,7 @@ export default function ProposalDetail() {
             {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
           </select>
           <button className="btn btn-secondary" onClick={() => setShowEmail(true)}>✉ Email</button>
+          <Link to="/proposals" state={{ editId: id }} className="btn btn-secondary">✏ Edit</Link>
           <a href={`/api/proposals/${id}/pdf`} className="btn btn-primary" target="_blank" rel="noreferrer">⬇ PDF</a>
           <button className="btn btn-danger" onClick={del}>Delete</button>
         </div>
