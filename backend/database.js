@@ -193,6 +193,30 @@ const SCHEMA = `
     key TEXT PRIMARY KEY,
     value TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    job_type TEXT DEFAULT 'maintenance',
+    technician TEXT,
+    status TEXT DEFAULT 'scheduled',
+    scheduled_date TEXT,
+    scheduled_time TEXT,
+    duration_hours REAL DEFAULT 2,
+    notes TEXT,
+    is_reminder INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `;
 
 async function initDb() {

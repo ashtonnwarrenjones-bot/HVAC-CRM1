@@ -10,14 +10,19 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api/companies', require('./routes/companies'));
-app.use('/api/contacts', require('./routes/contacts'));
-app.use('/api/proposals', require('./routes/proposals'));
-app.use('/api/deals', require('./routes/deals'));
-app.use('/api/settings', require('./routes/settings'));
+// Auth routes (public — no token required)
+app.use('/api/auth', require('./routes/auth'));
 
-// Health check
+// Protected API routes — require valid JWT
+const requireAuth = require('./middleware/auth');
+app.use('/api/companies', requireAuth, require('./routes/companies'));
+app.use('/api/contacts', requireAuth, require('./routes/contacts'));
+app.use('/api/proposals', requireAuth, require('./routes/proposals'));
+app.use('/api/deals', requireAuth, require('./routes/deals'));
+app.use('/api/settings', requireAuth, require('./routes/settings'));
+app.use('/api/jobs', requireAuth, require('./routes/jobs'));
+
+// Health check (public)
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
 // Serve React build in production
