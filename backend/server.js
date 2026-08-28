@@ -13,14 +13,21 @@ app.use(express.urlencoded({ extended: true }));
 // Auth routes (public — no token required)
 app.use('/api/auth', require('./routes/auth'));
 
+// Public proposal signing routes (must be before requireAuth on /api/proposals)
+const proposalsRouter = require('./routes/proposals');
+app.get('/api/proposals/sign/:token', (req, res, next) => proposalsRouter(req, res, next));
+app.post('/api/proposals/sign/:token', (req, res, next) => proposalsRouter(req, res, next));
+
 // Protected API routes — require valid JWT
 const requireAuth = require('./middleware/auth');
 app.use('/api/companies', requireAuth, require('./routes/companies'));
 app.use('/api/contacts', requireAuth, require('./routes/contacts'));
-app.use('/api/proposals', requireAuth, require('./routes/proposals'));
+app.use('/api/proposals', requireAuth, proposalsRouter);
 app.use('/api/deals', requireAuth, require('./routes/deals'));
 app.use('/api/settings', requireAuth, require('./routes/settings'));
 app.use('/api/jobs', requireAuth, require('./routes/jobs'));
+app.use('/api/tasks', requireAuth, require('./routes/tasks'));
+app.use('/api/attachments', requireAuth, require('./routes/attachments'));
 
 // Health check (public)
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));

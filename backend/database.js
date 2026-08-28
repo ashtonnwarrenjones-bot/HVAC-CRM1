@@ -217,6 +217,32 @@ const SCHEMA = `
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+    deal_id INTEGER REFERENCES deals(id) ON DELETE SET NULL,
+    contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    notes TEXT,
+    due_date TEXT,
+    assigned_to TEXT,
+    priority TEXT DEFAULT 'normal',
+    completed INTEGER DEFAULT 0,
+    completed_at TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+    proposal_id INTEGER REFERENCES proposals(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    mimetype TEXT,
+    size INTEGER,
+    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `;
 
 async function initDb() {
@@ -234,6 +260,16 @@ async function initDb() {
 
   // Create tables (safe to run on existing DB — IF NOT EXISTS)
   _sqlDb.run(SCHEMA);
+
+  // Migrations — add new columns to existing tables (safe: ignore if already exists)
+  const migrations = [
+    'ALTER TABLE proposals ADD COLUMN signature_token TEXT',
+    'ALTER TABLE proposals ADD COLUMN signed_at TEXT',
+    'ALTER TABLE proposals ADD COLUMN signed_by TEXT',
+  ];
+  migrations.forEach(sql => {
+    try { _sqlDb.run(sql); } catch (_) { /* column already exists */ }
+  });
 
   // Write initial file to disk
   saveDb();

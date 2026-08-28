@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import EmailCompose from '../components/EmailCompose';
 
+const API = import.meta.env.VITE_API_URL ?? '';
 const STATUS_OPTIONS = ['draft', 'sent', 'accepted', 'declined'];
 const STATUS_COLORS = {
   draft: 'badge-gray', sent: 'badge-blue', accepted: 'badge-green', declined: 'badge-red',
@@ -14,9 +15,22 @@ export default function ProposalDetail() {
   const [proposal, setProposal] = useState(null);
   const [saving, setSaving] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
+  const [sigLink, setSigLink] = useState('');
+  const [sigCopied, setSigCopied] = useState(false);
+  const [requestingSig, setRequestingSig] = useState(false);
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef();
 
-  const load = () => axios.get(`/api/proposals/${id}`).then(r => setProposal(r.data));
-  useEffect(() => { load(); }, [id]);
+  const load = useCallback(() =>
+    axios.get(`/api/proposals/${id}`).then(r => setProposal(r.data))
+  , [id]);
+
+  const loadAttachments = useCallback(() =>
+    axios.get(`/api/attachments?proposal_id=${id}`).then(r => setAttachments(r.data))
+  , [id]);
+
+  useEffect(() => { load(); loadAttachments(); }, [load, loadAttachments]);
 
   const updateStatus = async (status) => {
     await axios.put(`/api/proposals/${id}`, { ...proposal, status });
@@ -29,9 +43,50 @@ export default function ProposalDetail() {
     navigate('/proposals');
   };
 
+  const requestSignature = async () => {
+    setRequestingSig(true);
+    try {
+      const r = await axios.post(`/api/proposals/${id}/request-signature`);
+      setSigLink(r.data.signing_url);
+      load();
+    } catch (e) {
+      alert('Failed to generate signing link.');
+    } finally { setRequestingSig(false); }
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(sigLink).then(() => {
+      setSigCopied(true);
+      setTimeout(() => setSigCopied(false), 2000);
+    });
+  };
+
+  const uploadFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    const form = new FormData();
+    form.append('file', file);
+    form.append('proposal_id', id);
+    try {
+      await axios.post('/api/attachments', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      loadAttachments();
+    } catch { alert('Upload failed.'); }
+    finally { setUploading(false); e.target.value = ''; }
+  };
+
+  const deleteAttachment = async (attId) => {
+    if (!confirm('Remove this file?')) return;
+    await axios.delete(`/api/attachments/${attId}`);
+    setAttachments(a => a.filter(x => x.id !== attId));
+  };
+
   const fmt = (n) => '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtSize = (bytes) => bytes > 1048576 ? `${(bytes/1048576).toFixed(1)} MB` : `${Math.round(bytes/1024)} KB`;
 
   if (!proposal) return <div className="page-content"><p className="text-muted">Loading...</p></div>;
+
+  const isSigned = !!proposal.signed_at;
 
   return (
     <>
@@ -44,10 +99,15 @@ export default function ProposalDetail() {
               <span className="text-muted text-sm">{proposal.proposal_number}</span>
               <span className={`badge ${STATUS_COLORS[proposal.status] || 'badge-gray'}`}>{proposal.status}</span>
               {proposal.service_type && <span className="text-muted text-sm">{proposal.service_type}</span>}
+              {isSigned && (
+                <span style={{ background: '#d1fae5', color: '#065f46', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                  ✅ Signed by {proposal.signed_by}
+                </span>
+              )}
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
           <select
             className="form-control"
             style={{ width: 160, fontSize: 13 }}
@@ -57,19 +117,60 @@ export default function ProposalDetail() {
             {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
           </select>
           <button className="btn btn-secondary" onClick={() => setShowEmail(true)}>✉ Email</button>
-          <a
-            href={`/api/proposals/${id}/pdf`}
-            className="btn btn-primary"
-            target="_blank"
-            rel="noreferrer"
-          >
-            ⬇ Download PDF
-          </a>
+          <a href={`/api/proposals/${id}/pdf`} className="btn btn-primary" target="_blank" rel="noreferrer">⬇ PDF</a>
           <button className="btn btn-danger" onClick={del}>Delete</button>
         </div>
       </div>
 
       <div className="page-content">
+
+        {/* Signature banner */}
+        {isSigned ? (
+          <div style={{ background: '#d1fae5', border: '1px solid #6ee7b7', borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 22 }}>✅</span>
+            <div>
+              <div style={{ fontWeight: 700, color: '#065f46' }}>Proposal Signed</div>
+              <div style={{ fontSize: 13, color: '#047857' }}>
+                Signed by <strong>{proposal.signed_by}</strong> on {new Date(proposal.signed_at).toLocaleDateString()} at {new Date(proposal.signed_at).toLocaleTimeString()}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '14px 18px', marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 600, color: '#1e40af', fontSize: 14 }}>✍️ E-Signature</div>
+                <div style={{ fontSize: 13, color: '#3b82f6' }}>
+                  {sigLink ? 'Send this link to your customer to collect their signature.' : 'Generate a signing link to collect an electronic signature.'}
+                </div>
+              </div>
+              {!sigLink ? (
+                <button
+                  onClick={requestSignature}
+                  disabled={requestingSig}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#1e40af', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {requestingSig ? 'Generating…' : '🔗 Generate Signing Link'}
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    readOnly value={sigLink}
+                    style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid #bfdbfe', fontSize: 12, width: 260, background: '#fff', color: '#374151' }}
+                    onClick={e => e.target.select()}
+                  />
+                  <button
+                    onClick={copyLink}
+                    style={{ padding: '7px 14px', borderRadius: 7, border: 'none', background: sigCopied ? '#10b981' : '#1e40af', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    {sigCopied ? '✓ Copied!' : 'Copy'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="two-col" style={{ marginBottom: 24 }}>
           {/* Left: proposal info */}
           <div className="card">
@@ -191,6 +292,46 @@ export default function ProposalDetail() {
               </table>
             )}
           </div>
+        </div>
+
+        {/* Attachments */}
+        <div className="card mt-4">
+          <div className="card-header">
+            <h3>📎 Attachments</h3>
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              {uploading ? 'Uploading…' : '+ Upload File'}
+            </button>
+            <input ref={fileRef} type="file" hidden onChange={uploadFile} />
+          </div>
+          {attachments.length === 0 ? (
+            <div style={{ padding: '20px 20px', color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>
+              No files attached yet — upload contracts, photos, or documents.
+            </div>
+          ) : (
+            <div style={{ padding: '8px 0' }}>
+              {attachments.map(att => (
+                <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid #f3f4f6' }}>
+                  <span style={{ fontSize: 20 }}>{att.mimetype?.startsWith('image/') ? '🖼️' : att.mimetype === 'application/pdf' ? '📄' : '📎'}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{att.original_name}</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af' }}>{fmtSize(att.size)} · {new Date(att.uploaded_at).toLocaleDateString()}</div>
+                  </div>
+                  <a
+                    href={`${API}/api/attachments/${att.id}/download`}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', fontSize: 12, color: '#374151', textDecoration: 'none', fontWeight: 500 }}
+                  >⬇ Download</a>
+                  <button
+                    onClick={() => deleteAttachment(att.id)}
+                    style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#fee2e2', color: '#dc2626', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Terms */}

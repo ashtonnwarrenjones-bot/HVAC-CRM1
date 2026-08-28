@@ -5,6 +5,7 @@ const XLSX = require('xlsx');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const db = require('../database');
 
 // Helper: load settings with defaults
@@ -382,6 +383,57 @@ router.get('/:id/pdf', (req, res) => {
       50, doc.page.height - 40, { align: 'center', width: doc.page.width - 100 });
 
   doc.end();
+});
+
+// POST /:id/request-signature — generate a signing token and return the signing URL
+router.post('/:id/request-signature', (req, res) => {
+  const proposal = db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
+  if (!proposal) return res.status(404).json({ error: 'Proposal not found' });
+
+  const token = crypto.randomBytes(24).toString('hex');
+  db.prepare('UPDATE proposals SET signature_token = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(token, 'sent', req.params.id);
+
+  const baseUrl = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+  res.json({ token, signing_url: `${baseUrl}/sign/${token}` });
+});
+
+// GET /sign/:token — PUBLIC: return proposal summary for the signer (no auth)
+router.get('/sign/:token', (req, res) => {
+  const proposal = db.prepare(`
+    SELECT p.id, p.title, p.proposal_number, p.total_amount, p.subtotal, p.tax_rate, p.tax_amount,
+           p.status, p.signed_at, p.signed_by, p.notes, p.terms,
+           co.name AS company_name
+    FROM proposals p
+    LEFT JOIN companies co ON p.company_id = co.id
+    WHERE p.signature_token = ?
+  `).get(req.params.token);
+
+  if (!proposal) return res.status(404).json({ error: 'Invalid or expired signing link' });
+
+  const lineItems = db.prepare(
+    'SELECT * FROM proposal_line_items WHERE proposal_id = ? ORDER BY sort_order ASC, id ASC'
+  ).all(proposal.id);
+
+  res.json({ ...proposal, line_items: lineItems });
+});
+
+// POST /sign/:token — PUBLIC: submit signature (no auth)
+router.post('/sign/:token', (req, res) => {
+  const { signed_by } = req.body;
+  if (!signed_by || !signed_by.trim()) return res.status(400).json({ error: 'Full name is required to sign' });
+
+  const proposal = db.prepare('SELECT id, status, signed_at FROM proposals WHERE signature_token = ?').get(req.params.token);
+  if (!proposal) return res.status(404).json({ error: 'Invalid or expired signing link' });
+  if (proposal.signed_at) return res.status(409).json({ error: 'This proposal has already been signed' });
+
+  db.prepare(`
+    UPDATE proposals SET signed_by = ?, signed_at = CURRENT_TIMESTAMP,
+      status = 'accepted', updated_at = CURRENT_TIMESTAMP
+    WHERE signature_token = ?
+  `).run(signed_by.trim(), req.params.token);
+
+  res.json({ success: true, message: 'Proposal signed successfully' });
 });
 
 module.exports = router;
