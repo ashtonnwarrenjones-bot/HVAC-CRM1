@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { Columns, LayoutGrid, List, Building2, Calendar, Pencil } from 'lucide-react';
 
 const STAGES = [
   { key: 'lead',       label: 'Lead',       color: '#6b7280', prob: 10 },
@@ -38,7 +39,7 @@ export default function Pipeline() {
   const [pendingLost, setPendingLost] = useState(null);
   const [dragging, setDragging] = useState(null);
   const [dragOver, setDragOver] = useState(null);
-  const [view, setView] = useState('kanban'); // 'kanban' | 'cards' | 'list'
+  const [view, setView] = useState(() => window.innerWidth < 700 ? 'cards' : 'kanban'); // 'kanban' | 'cards' | 'list'
 
   const load = () => axios.get('/api/deals').then(r => setDeals(r.data));
 
@@ -140,7 +141,7 @@ export default function Pipeline() {
               {deal.title}
             </div>
             {deal.company_name && (
-              <div style={{ fontSize: 12, color: '#6b7280' }}>🏢 {deal.company_name}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}><Building2 size={11} /> {deal.company_name}</div>
             )}
           </div>
           {deal.value > 0 && (
@@ -148,21 +149,30 @@ export default function Pipeline() {
           )}
         </div>
         {deal.close_date && (
-          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-            📅 Close: {new Date(deal.close_date + 'T12:00:00').toLocaleDateString()}
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Calendar size={11} /> Close: {new Date(deal.close_date + 'T12:00:00').toLocaleDateString()}
           </div>
         )}
-        <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
-          {STAGES.filter(s => s.key !== stage.key && s.key !== 'lost').slice(0, compact ? 2 : 2).map(s => (
-            <button key={s.key} onClick={() => moveStage(deal.id, s.key)}
-              style={{ fontSize: 10, padding: '3px 7px', borderRadius: 4, background: s.color + '18', color: s.color, border: `1px solid ${s.color}44`, cursor: 'pointer', fontWeight: 600 }}>
-              → {s.label.replace(' ✓', '').replace(' ✗', '')}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={() => openEdit(deal)}
+            style={{ fontSize: 10, padding: '3px 9px', borderRadius: 4, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
+            <Pencil size={10} /> Edit
+          </button>
+          {/* Show next logical stage only (keeps it tidy on mobile) */}
+          {(() => {
+            const idx = STAGES.findIndex(s => s.key === stage.key);
+            const nextStages = STAGES.slice(idx + 1).filter(s => s.key !== 'lost');
+            return nextStages.slice(0, 1).map(s => (
+              <button key={s.key} onClick={() => moveStage(deal.id, s.key)}
+                style={{ fontSize: 10, padding: '3px 9px', borderRadius: 4, background: s.color + '18', color: s.color, border: `1px solid ${s.color}44`, cursor: 'pointer', fontWeight: 600 }}>
+                → {s.label.replace(' ✓', '').replace(' ✗', '')}
+              </button>
+            ));
+          })()}
           {stage.key !== 'lost' && stage.key !== 'won' && (
             <button onClick={() => moveStage(deal.id, 'lost')}
-              style={{ fontSize: 10, padding: '3px 7px', borderRadius: 4, background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', cursor: 'pointer', fontWeight: 600 }}>
-              Lost
+              style={{ fontSize: 10, padding: '3px 9px', borderRadius: 4, background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', cursor: 'pointer', fontWeight: 600 }}>
+              ✗ Lost
             </button>
           )}
         </div>
@@ -172,6 +182,13 @@ export default function Pipeline() {
 
   return (
     <>
+      <style>{`
+        @media (max-width: 600px) {
+          .pipeline-stats { grid-template-columns: 1fr !important; gap: 8px !important; }
+          .pipeline-stats .stat-card { padding: 10px 14px !important; }
+          .pipeline-stats .stat-value { font-size: 20px !important; }
+        }
+      `}</style>
       {/* ── Page header ── */}
       <div className="page-header" style={{ flexWrap: 'wrap', gap: 8 }}>
         <h2>Pipeline</h2>
@@ -179,15 +196,16 @@ export default function Pipeline() {
           {/* View toggle */}
           <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 6, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
             {[
-              { key: 'kanban', icon: '📋', label: 'Kanban' },
-              { key: 'cards', icon: '🗂️', label: 'Cards' },
-              { key: 'list', icon: '📃', label: 'List' },
+              { key: 'kanban', Icon: Columns, label: 'Kanban' },
+              { key: 'cards', Icon: LayoutGrid, label: 'Cards' },
+              { key: 'list', Icon: List, label: 'List' },
             ].map(v => (
               <button key={v.key} onClick={() => setView(v.key)}
                 style={{ padding: '6px 10px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500,
                   background: view === v.key ? '#2563eb' : 'transparent',
-                  color: view === v.key ? '#fff' : '#555', transition: 'all .15s', whiteSpace: 'nowrap' }}>
-                {v.icon} <span className="hide-xs">{v.label}</span>
+                  color: view === v.key ? '#fff' : '#555', transition: 'all .15s', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 5 }}>
+                <v.Icon size={14} /> <span className="hide-xs">{v.label}</span>
               </button>
             ))}
           </div>
@@ -197,7 +215,7 @@ export default function Pipeline() {
 
       <div className="page-content">
         {/* Stats */}
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
+        <div className="stats-grid pipeline-stats" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
           <div className="stat-card">
             <div className="stat-label">Open Pipeline</div>
             <div className="stat-value" style={{ color: 'var(--blue-700)' }}>{fmt(totalPipeline)}</div>

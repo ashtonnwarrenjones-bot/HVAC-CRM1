@@ -3,6 +3,11 @@ import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-do
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Logo from './components/Logo';
 import axios from 'axios';
+import {
+  LayoutDashboard, Calendar, Target, Building2, Users,
+  FileText, BarChart2, Settings as SettingsIcon, Globe,
+  Bell, LogOut, Menu, X, CheckCircle, Clock, Trash2
+} from 'lucide-react';
 import Login from './pages/Login';
 import Portal from './pages/Portal';
 import Sign from './pages/Sign';
@@ -18,13 +23,13 @@ import Settings from './pages/Settings';
 import Analytics from './pages/Analytics';
 
 const NAV = [
-  { to: '/', label: 'Dashboard', icon: '📊', exact: true },
-  { to: '/schedule', label: 'Schedule', icon: '📅' },
-  { to: '/pipeline', label: 'Pipeline', icon: '🎯' },
-  { to: '/companies', label: 'Companies', icon: '🏢' },
-  { to: '/contacts', label: 'Contacts', icon: '👤' },
-  { to: '/proposals', label: 'Proposals', icon: '📋' },
-  { to: '/analytics', label: 'Analytics', icon: '📈' },
+  { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true },
+  { to: '/schedule', label: 'Schedule', Icon: Calendar },
+  { to: '/pipeline', label: 'Pipeline', Icon: Target },
+  { to: '/companies', label: 'Companies', Icon: Building2 },
+  { to: '/contacts', label: 'Contacts', Icon: Users },
+  { to: '/proposals', label: 'Proposals', Icon: FileText },
+  { to: '/analytics', label: 'Analytics', Icon: BarChart2 },
 ];
 
 function NotificationsPanel({ onClose }) {
@@ -50,7 +55,11 @@ function NotificationsPanel({ onClose }) {
     load();
   };
 
-  const typeIcon = (type) => type === 'proposal_signed' ? '✅' : type === 'job_scheduled' ? '📅' : '🔔';
+  const typeIcon = (type) => type === 'proposal_signed'
+    ? <CheckCircle size={15} color="#16a34a" />
+    : type === 'job_scheduled'
+    ? <Calendar size={15} color="#2563eb" />
+    : <Bell size={15} color="#6b7280" />;
 
   return (
     <div style={{
@@ -78,14 +87,14 @@ function NotificationsPanel({ onClose }) {
               display: 'flex', gap: 8, alignItems: 'flex-start'
             }}
           >
-            <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{typeIcon(n.type)}</span>
+            <span style={{ flexShrink: 0, marginTop: 1 }}>{typeIcon(n.type)}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12, fontWeight: n.read_at ? 500 : 700, color: '#111', lineHeight: 1.4 }}>{n.title}</div>
               {n.message && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{n.message}</div>}
               {n.sales_rep_name && <div style={{ fontSize: 11, color: '#2563eb', marginTop: 2 }}>Rep: {n.sales_rep_name}</div>}
               <div style={{ fontSize: 10, color: '#aaa', marginTop: 3 }}>{new Date(n.created_at).toLocaleString()}</div>
             </div>
-            <button onClick={(e) => dismiss(n.id, e)} style={{ background: 'none', border: 'none', color: '#bbb', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>✕</button>
+            <button onClick={(e) => dismiss(n.id, e)} style={{ background: 'none', border: 'none', color: '#bbb', cursor: 'pointer', padding: '0 2px', flexShrink: 0, display: 'flex', alignItems: 'center' }}><X size={14} /></button>
           </div>
         ))}
       </div>
@@ -131,7 +140,7 @@ function AppLayout() {
           onClick={() => setMenuOpen(o => !o)}
           aria-label="Open menu"
         >
-          {menuOpen ? '✕' : '☰'}
+          {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>
 
@@ -150,7 +159,7 @@ function AppLayout() {
           </div>
         </div>
         <div className="sidebar-nav">
-          {NAV.map(({ to, label, icon, exact }) => (
+          {NAV.map(({ to, label, Icon, exact }) => (
             <NavLink
               key={to}
               to={to}
@@ -158,7 +167,7 @@ function AppLayout() {
               className={({ isActive }) => isActive ? 'active' : ''}
               onClick={closeMenu}
             >
-              <span className="nav-icon">{icon}</span>
+              <span className="nav-icon"><Icon size={17} /></span>
               {label}
             </NavLink>
           ))}
@@ -171,7 +180,7 @@ function AppLayout() {
             onClick={closeMenu}
             style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 6, color: 'rgba(255,255,255,.7)', textDecoration: 'none', fontSize: '13.5px', fontWeight: 500 }}
           >
-            <span className="nav-icon">🌐</span>
+            <span className="nav-icon"><Globe size={17} /></span>
             Customer Portal
           </a>
           <NavLink
@@ -180,7 +189,7 @@ function AppLayout() {
             onClick={closeMenu}
             style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 6, color: 'rgba(255,255,255,.7)', textDecoration: 'none', fontSize: '13.5px', fontWeight: 500 }}
           >
-            <span className="nav-icon">⚙️</span>
+            <span className="nav-icon"><SettingsIcon size={17} /></span>
             Settings
           </NavLink>
         </div>
@@ -194,10 +203,10 @@ function AppLayout() {
               style={{
                 flex: '0 0 auto', padding: '7px 10px', background: showNotifs ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.08)',
                 border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, color: 'rgba(255,255,255,.8)',
-                fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, position: 'relative'
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, position: 'relative'
               }}
             >
-              🔔
+              <Bell size={16} />
               {unreadCount > 0 && (
                 <span style={{ background: '#ef4444', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 5px', lineHeight: 1.4 }}>
                   {unreadCount > 9 ? '9+' : unreadCount}
@@ -212,7 +221,7 @@ function AppLayout() {
                 fontSize: 12, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8
               }}
             >
-              🚪 Sign Out
+              <LogOut size={14} /> Sign Out
             </button>
           </div>
           {showNotifs && <NotificationsPanel onClose={() => setShowNotifs(false)} />}

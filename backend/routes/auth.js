@@ -34,7 +34,8 @@ router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    // Case-insensitive lookup so "Demo", "DEMO", "demo" all work
+    const user = db.prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?)').get(username);
     if (!user) return res.status(401).json({ error: 'Invalid username or password' });
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid username or password' });

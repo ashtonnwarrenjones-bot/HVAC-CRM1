@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { AlertTriangle, ClipboardList, Building2 } from 'lucide-react';
 
 const CONTRACT_COLORS = {
   maintenance_contract: 'badge-green',
@@ -135,7 +136,7 @@ export default function Dashboard() {
         {/* Overdue alert */}
         {overdueTasks.length > 0 && (
           <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 18 }}>⚠️</span>
+            <AlertTriangle size={18} color="#991b1b" />
             <span style={{ fontSize: 13, fontWeight: 600, color: '#991b1b' }}>
               {overdueTasks.length} overdue task{overdueTasks.length > 1 ? 's' : ''} need{overdueTasks.length === 1 ? 's' : ''} attention
             </span>
@@ -178,7 +179,7 @@ export default function Dashboard() {
           {/* Tasks widget */}
           <div className="card">
             <div className="card-header">
-              <h3>📋 Tasks & Follow-ups</h3>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 7 }}><ClipboardList size={16} /> Tasks & Follow-ups</h3>
               <span style={{ fontSize: 12, color: '#6b7280' }}>{tasks.length} open</span>
             </div>
             <div className="card-body" style={{ paddingBottom: 0 }}>
@@ -228,8 +229,8 @@ export default function Dashboard() {
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
                         {task.company_name && (
-                          <Link to={`/companies/${task.company_id}`} style={{ fontSize: 11, color: '#6b7280', textDecoration: 'none' }}>
-                            🏢 {task.company_name}
+                          <Link to={`/companies/${task.company_id}`} style={{ fontSize: 11, color: '#6b7280', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <Building2 size={11} /> {task.company_name}
                           </Link>
                         )}
                         {due && (
