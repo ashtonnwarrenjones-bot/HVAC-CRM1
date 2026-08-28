@@ -38,8 +38,9 @@ router.post('/login', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Invalid username or password' });
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid username or password' });
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, username: user.username });
+    const role = user.role || 'admin';
+    const token = jwt.sign({ id: user.id, username: user.username, role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ token, username: user.username, role });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

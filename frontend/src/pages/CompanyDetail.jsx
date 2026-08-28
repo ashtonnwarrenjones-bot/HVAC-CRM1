@@ -70,6 +70,11 @@ export default function CompanyDetail() {
   const [newTaskPriority, setNewTaskPriority] = useState('normal');
   const [addingTask, setAddingTask] = useState(false);
 
+  // Portal invite state
+  const [portalInvite, setPortalInvite] = useState(null); // { portal_url, contact_name }
+  const [inviting, setInviting] = useState(null); // contact_id being invited
+  const [inviteCopied, setInviteCopied] = useState(false);
+
   const load = useCallback(() => axios.get(`/api/companies/${id}`).then(r => setCompany(r.data)), [id]);
   const loadAttachments = useCallback(() => axios.get(`/api/attachments?company_id=${id}`).then(r => setAttachments(r.data)), [id]);
   const loadTasks = useCallback(() => axios.get(`/api/tasks?company_id=${id}`).then(r => setTasks(r.data)), [id]);
@@ -88,6 +93,25 @@ export default function CompanyDetail() {
     if (!confirm(`Remove ${name}?`)) return;
     await axios.delete(`/api/contacts/${cid}`);
     load();
+  };
+
+  const sendPortalInvite = async (contactId) => {
+    setInviting(contactId);
+    try {
+      const r = await axios.post(`/api/portal/admin/invite/${contactId}`);
+      setPortalInvite(r.data);
+    } catch (e) {
+      alert(e.response?.data?.error || 'Failed to generate portal link.');
+    } finally {
+      setInviting(null);
+    }
+  };
+
+  const copyInviteLink = () => {
+    navigator.clipboard.writeText(portalInvite?.portal_url || '').then(() => {
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    });
   };
 
   const addNote = async () => {
@@ -247,7 +271,16 @@ export default function CompanyDetail() {
                           {c.mobile && <span className="text-sm text-muted">📱 {c.mobile}</span>}
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ fontSize: 11, color: '#2563eb' }}
+                          disabled={inviting === c.id}
+                          onClick={() => sendPortalInvite(c.id)}
+                          title="Generate customer portal link"
+                        >
+                          {inviting === c.id ? '…' : '🔗 Portal'}
+                        </button>
                         <button className="btn btn-ghost btn-sm" onClick={() => {
                           setContactForm({ ...c, is_primary: !!c.is_primary });
                           setEditContactId(c.id);
@@ -557,6 +590,42 @@ export default function CompanyDetail() {
       )}
 
       {/* ── Email Compose ── */}
+      {/* ── Portal Invite Modal ── */}
+      {portalInvite && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setPortalInvite(null)}>
+          <div className="modal" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h3>🔗 Customer Portal Link</h3>
+              <button className="btn btn-ghost btn-sm" onClick={() => setPortalInvite(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ background: '#d1fae5', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 13, color: '#065f46' }}>
+                ✅ Portal link generated for <strong>{portalInvite.contact_name}</strong>
+              </div>
+              <p style={{ fontSize: 13, color: '#374151', marginBottom: 12 }}>
+                Copy this link and send it to your customer. They'll land directly in their portal — no password needed.
+              </p>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input
+                  readOnly value={portalInvite.portal_url}
+                  style={{ flex: 1, padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 12, color: '#374151', background: '#f9fafb' }}
+                  onClick={e => e.target.select()}
+                />
+                <button
+                  onClick={copyInviteLink}
+                  style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: inviteCopied ? '#059669' : '#1e3a5f', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {inviteCopied ? '✓ Copied!' : 'Copy'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                Link expires in 90 days. Generate a new one anytime to refresh access.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showEmail && (
         <EmailCompose
           context={{

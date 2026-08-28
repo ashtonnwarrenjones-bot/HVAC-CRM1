@@ -3,12 +3,22 @@ import axios from 'axios';
 
 const AuthContext = createContext(null);
 
+function parseRole(token) {
+  if (!token) return 'admin';
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.role || 'admin';
+  } catch { return 'admin'; }
+}
+
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem('crm_token'));
   const [username, setUsername] = useState(() => localStorage.getItem('crm_user'));
+  const [role, setRole] = useState(() => parseRole(localStorage.getItem('crm_token')));
   const [loading, setLoading] = useState(false);
 
-  // Attach token to all axios requests
+  const isDemo = role === 'demo';
+
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -17,7 +27,6 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
-  // Handle 401 responses globally — auto-logout
   useEffect(() => {
     const id = axios.interceptors.response.use(
       res => res,
@@ -34,6 +43,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('crm_user', newUsername);
     setToken(newToken);
     setUsername(newUsername);
+    setRole(parseRole(newToken));
   }
 
   function logout() {
@@ -41,10 +51,11 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('crm_user');
     setToken(null);
     setUsername(null);
+    setRole('admin');
   }
 
   return (
-    <AuthContext.Provider value={{ token, username, login, logout, loading, setLoading }}>
+    <AuthContext.Provider value={{ token, username, role, isDemo, login, logout, loading, setLoading }}>
       {children}
     </AuthContext.Provider>
   );

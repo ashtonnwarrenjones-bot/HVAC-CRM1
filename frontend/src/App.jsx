@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-do
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Logo from './components/Logo';
 import Login from './pages/Login';
+import Portal from './pages/Portal';
 import Sign from './pages/Sign';
 import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
@@ -26,7 +27,7 @@ const NAV = [
 ];
 
 function AppLayout() {
-  const { token, username, logout } = useAuth();
+  const { token, username, logout, isDemo } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   if (!token) return <Login />;
@@ -104,6 +105,14 @@ function AppLayout() {
         </div>
       </nav>
 
+      {/* ── Demo mode banner ── */}
+      {isDemo && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: '#1d4ed8', color: '#fff', textAlign: 'center', padding: '10px 16px', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          <span>👁️ Demo Mode — Read Only</span>
+          <span style={{ opacity: .7, fontWeight: 400 }}>Login: <strong>demo</strong> · Password: <strong>demo123</strong></span>
+        </div>
+      )}
+
       {/* ── Main content ── */}
       <main className="main">
         <Routes>
@@ -131,6 +140,8 @@ export default function App() {
         <Routes>
           {/* Public signing page — no auth required */}
           <Route path="/sign/:token" element={<Sign />} />
+          {/* Customer portal — has its own auth */}
+          <Route path="/portal/*" element={<Portal />} />
           {/* All other routes go through the authenticated layout */}
           <Route path="/*" element={<AppLayout />} />
         </Routes>

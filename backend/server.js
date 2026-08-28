@@ -5,31 +5,50 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Auth routes (public — no token required)
+// Auth routes (public)
 app.use('/api/auth', require('./routes/auth'));
 
-// Public proposal signing routes (must be before requireAuth on /api/proposals)
+// Public proposal signing routes
 const proposalsRouter = require('./routes/proposals');
 app.get('/api/proposals/sign/:token', (req, res, next) => proposalsRouter(req, res, next));
 app.post('/api/proposals/sign/:token', (req, res, next) => proposalsRouter(req, res, next));
 
-// Protected API routes — require valid JWT
-const requireAuth = require('./middleware/auth');
-app.use('/api/companies', requireAuth, require('./routes/companies'));
-app.use('/api/contacts', requireAuth, require('./routes/contacts'));
-app.use('/api/proposals', requireAuth, proposalsRouter);
-app.use('/api/deals', requireAuth, require('./routes/deals'));
-app.use('/api/settings', requireAuth, require('./routes/settings'));
-app.use('/api/jobs', requireAuth, require('./routes/jobs'));
-app.use('/api/tasks', requireAuth, require('./routes/tasks'));
-app.use('/api/attachments', requireAuth, require('./routes/attachments'));
+// Public portal auth (magic link verification) — must be before portal middleware
+const portalRouter = require('./routes/portal');
+app.get('/api/portal/auth/:token', (req, res, next) => portalRouter(req, res, next));
 
-// Health check (public)
+// Protected API routes — require valid admin JWT
+const requireAuth = require('./middleware/auth');
+
+// Demo guard — block all write operations for demo/read-only role
+const demoGuard = (req, res, next) => {
+  if (req.user?.role === 'demo' && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    return res.status(403).json({ error: 'This is a read-only demo account. Sign up for a full account to make changes.' });
+  }
+  next();
+};
+
+app.use('/api/companies', requireAuth, demoGuard, require('./routes/companies'));
+app.use('/api/contacts', requireAuth, demoGuard, require('./routes/contacts'));
+app.use('/api/proposals', requireAuth, demoGuard, proposalsRouter);
+app.use('/api/deals', requireAuth, demoGuard, require('./routes/deals'));
+app.use('/api/settings', requireAuth, demoGuard, require('./routes/settings'));
+app.use('/api/jobs', requireAuth, demoGuard, require('./routes/jobs'));
+app.use('/api/tasks', requireAuth, demoGuard, require('./routes/tasks'));
+app.use('/api/attachments', requireAuth, demoGuard, require('./routes/attachments'));
+
+// Portal admin routes (admin JWT required)
+app.use('/api/portal/admin', requireAuth, demoGuard, portalRouter);
+
+// Portal customer routes (portal JWT required)
+const requirePortalAuth = require('./middleware/portalAuth');
+app.use('/api/portal', requirePortalAuth, portalRouter);
+
+// Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
 // Serve React build in production
@@ -40,13 +59,12 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Initialize database, then start server
 const { initDb } = require('./database');
-
 initDb()
   .then(() => {
     app.listen(PORT, () => {
-      console.log(`\n🔧 HVAC CRM API running at http://localhost:${PORT}`);
+      console.log(`\n⚡ Conduit API running at http://localhost:${PORT}`);
+      console.log(`   Demo login: username=demo  password=demo123`);
       console.log(`   Health: http://localhost:${PORT}/api/health\n`);
     });
   })
