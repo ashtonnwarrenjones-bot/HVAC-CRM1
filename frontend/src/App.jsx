@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
@@ -23,12 +23,35 @@ const NAV = [
 
 function AppLayout() {
   const { token, username, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   if (!token) return <Login />;
 
+  function closeMenu() { setMenuOpen(false); }
+
   return (
     <div className="layout">
-      <nav className="sidebar">
+
+      {/* ── Mobile top bar ── */}
+      <div className="mobile-header">
+        <span className="mobile-logo">🔧 HVAC CRM</span>
+        <button
+          className="mobile-hamburger"
+          onClick={() => setMenuOpen(o => !o)}
+          aria-label="Open menu"
+        >
+          {menuOpen ? '✕' : '☰'}
+        </button>
+      </div>
+
+      {/* ── Sidebar backdrop (mobile only) ── */}
+      <div
+        className={`sidebar-backdrop${menuOpen ? ' open' : ''}`}
+        onClick={closeMenu}
+      />
+
+      {/* ── Sidebar ── */}
+      <nav className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-logo">
           <h1>🔧 HVAC CRM</h1>
           <span>Commercial Services</span>
@@ -40,6 +63,7 @@ function AppLayout() {
               to={to}
               end={exact}
               className={({ isActive }) => isActive ? 'active' : ''}
+              onClick={closeMenu}
             >
               <span className="nav-icon">{icon}</span>
               {label}
@@ -47,8 +71,12 @@ function AppLayout() {
           ))}
         </div>
         <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
-          <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 6, color: 'rgba(255,255,255,.7)', textDecoration: 'none', fontSize: '13.5px', fontWeight: 500 }}>
+          <NavLink
+            to="/settings"
+            className={({ isActive }) => isActive ? 'active' : ''}
+            onClick={closeMenu}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 6, color: 'rgba(255,255,255,.7)', textDecoration: 'none', fontSize: '13.5px', fontWeight: 500 }}
+          >
             <span className="nav-icon">⚙️</span>
             Settings
           </NavLink>
@@ -58,7 +86,7 @@ function AppLayout() {
             Signed in as <strong style={{ color: 'rgba(255,255,255,.7)' }}>{username}</strong>
           </div>
           <button
-            onClick={logout}
+            onClick={() => { logout(); closeMenu(); }}
             style={{
               width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,.08)',
               border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, color: 'rgba(255,255,255,.6)',
@@ -69,10 +97,11 @@ function AppLayout() {
           </button>
         </div>
         <div style={{ padding: '8px 16px 12px', fontSize: 11, color: 'rgba(255,255,255,.3)' }}>
-          v3.0 • HVAC & Plumbing CRM
+          v3.1 • HVAC & Plumbing CRM
         </div>
       </nav>
 
+      {/* ── Main content ── */}
       <main className="main">
         <Routes>
           <Route path="/" element={<Dashboard />} />

@@ -266,8 +266,116 @@ td.actions { display: flex; gap: 8px; }
 
 .tag { display: inline-flex; gap: 4px; background: var(--gray-100); border-radius: 4px; padding: 3px 8px; font-size: 12px; color: var(--gray-600); }
 
+/* ===== MOBILE TOP BAR ===== */
+.mobile-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 56px;
+  background: var(--gray-900);
+  padding: 0 4px 0 16px;
+  z-index: 200;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+.mobile-logo {
+  font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -.2px;
+}
+.mobile-hamburger {
+  background: none; border: none;
+  color: rgba(255,255,255,.85); font-size: 20px;
+  cursor: pointer; padding: 12px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+}
+.mobile-hamburger:active { background: rgba(255,255,255,.1); }
+
+/* Sidebar backdrop overlay */
+.sidebar-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 299;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== SCHEDULE PAGE RESPONSIVE HELPERS ===== */
+.sched-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex;
+  align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+}
+.sched-modal {
+  background: #fff; border-radius: 14px; padding: 28px; width: 100%; max-width: 560px;
+  max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.sched-page { padding: 24px; max-width: 1200px; margin: 0 auto; }
+.sched-top {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
+}
+.sched-top-right { display: flex; gap: 8px; flex-shrink: 0; }
+.cal-day-cell { min-height: 110px; }
+.cal-week-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.cal-week-inner { min-width: 520px; }
+
+/* ===== RESPONSIVE BREAKPOINTS ===== */
 @media (max-width: 768px) {
-  .stats-grid { grid-template-columns: 1fr 1fr; }
+  /* Show mobile header, hide sidebar by default */
+  .mobile-header { display: flex; }
+
+  /* Sidebar becomes a slide-in drawer */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(.4, 0, .2, 1);
+    z-index: 300;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-backdrop.open { display: block; }
+
+  /* Main content: full width, below top bar */
+  .main { margin-left: 0 !important; padding-top: 56px; }
+
+  /* Page spacing */
+  .page-content { padding: 14px; }
+  .page-header { padding: 12px 14px; }
+  .page-header h2 { font-size: 16px; }
+
+  /* Stats grid: 2 columns */
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat-card { padding: 14px 16px; }
+  .stat-card .stat-value { font-size: 21px; }
+
+  /* Grid forms */
   .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
   .two-col { grid-template-columns: 1fr; }
+
+  /* Toolbar search */
+  .toolbar { flex-wrap: wrap; padding: 10px 12px; }
+  .search-input { max-width: 100%; width: 100%; }
+
+  /* Tables scroll */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Modals → bottom sheets */
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal { border-radius: 16px 16px 0 0; max-width: 100% !important; max-height: 88vh; }
+  .modal-lg { max-width: 100% !important; }
+
+  /* Schedule page */
+  .sched-overlay { align-items: flex-end; padding: 0; }
+  .sched-modal {
+    border-radius: 20px 20px 0 0; max-width: 100%;
+    padding: 20px 16px; max-height: 88vh;
+  }
+  .sched-page { padding: 12px; }
+  .sched-top { flex-wrap: wrap; gap: 10px; }
+  .sched-top-right { width: 100%; justify-content: space-between; }
+  .cal-day-cell { min-height: 66px; }
+}
+
+@media (max-width: 480px) {
+  .page-content { padding: 10px; }
+  .stats-grid { gap: 8px; }
+  .stat-card .stat-value { font-size: 19px; }
+  .sched-page { padding: 8px; }
 }

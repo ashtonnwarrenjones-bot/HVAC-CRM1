@@ -92,7 +92,6 @@ export default function Schedule() {
   const firstDay = getFirstDayOfMonth(year, month);
   const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
 
-  // Week view: get current week from selected date or today
   const weekStart = (() => {
     const base = selectedDate ? new Date(selectedDate + 'T00:00:00') : new Date(year, month, today.getDate());
     const d = new Date(base);
@@ -101,14 +100,16 @@ export default function Schedule() {
   })();
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+    <div className="sched-page">
+
+      {/* ── Header ── */}
+      <div className="sched-top">
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Schedule</h2>
           <p style={{ margin: '2px 0 0', color: '#888', fontSize: 13 }}>Manage service jobs and appointments</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="sched-top-right">
+          {/* View switcher */}
           <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
             {['month', 'week', 'list'].map(v => (
               <button key={v} onClick={() => setView(v)}
@@ -120,41 +121,43 @@ export default function Schedule() {
             ))}
           </div>
           <button onClick={() => openCreate(dateStr(year, month, today.getDate()))}
-            style={{ padding: '7px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+            style={{ padding: '7px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             + New Job
           </button>
         </div>
       </div>
 
-      {/* Navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+      {/* ── Month navigation ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <button onClick={prevMonth} style={navBtn}>‹</button>
         <button onClick={nextMonth} style={navBtn}>›</button>
         <button onClick={goToday} style={{ ...navBtn, fontSize: 12, padding: '5px 12px' }}>Today</button>
-        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{MONTHS[month]} {year}</h3>
+        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{MONTHS[month]} {year}</h3>
       </div>
 
-      {/* Stats bar */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      {/* ── Status stats bar ── */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         {STATUSES.map(s => {
           const count = jobs.filter(j => j.status === s).length;
           return (
-            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 14px' }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: STATUS_COLORS[s] }} />
-              <span style={{ fontSize: 13, color: '#555' }}>{STATUS_LABELS[s]}: <strong>{count}</strong></span>
+            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '5px 12px' }}>
+              <div style={{ width: 9, height: 9, borderRadius: '50%', background: STATUS_COLORS[s], flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: '#555', whiteSpace: 'nowrap' }}>{STATUS_LABELS[s]}: <strong>{count}</strong></span>
             </div>
           );
         })}
       </div>
 
-      {/* Month View */}
+      {/* ── Month View ── */}
       {view === 'month' && (
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+          {/* Day headers */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
             {DAYS.map(d => (
-              <div key={d} style={{ padding: '10px 8px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '.5px' }}>{d}</div>
+              <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '.5px' }}>{d}</div>
             ))}
           </div>
+          {/* Day cells */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
             {Array.from({ length: totalCells }, (_, i) => {
               const dayNum = i - firstDay + 1;
@@ -165,30 +168,42 @@ export default function Schedule() {
               const dayJobs = ds ? jobsForDate(ds) : [];
               return (
                 <div key={i} onClick={() => isCurrentMonth && openCreate(ds)}
-                  style={{ minHeight: 110, padding: '6px 8px', borderRight: (i + 1) % 7 !== 0 ? '1px solid #e2e8f0' : 'none',
+                  className="cal-day-cell"
+                  style={{
+                    padding: '5px 4px',
+                    borderRight: (i + 1) % 7 !== 0 ? '1px solid #e2e8f0' : 'none',
                     borderBottom: i < totalCells - 7 ? '1px solid #e2e8f0' : 'none',
                     background: isToday ? '#eff6ff' : isCurrentMonth ? '#fff' : '#fafafa',
                     cursor: isCurrentMonth ? 'pointer' : 'default',
-                    transition: 'background .1s', position: 'relative' }}>
+                    transition: 'background .1s',
+                  }}>
                   {isCurrentMonth && (
                     <>
-                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: isToday ? '#2563eb' : 'transparent',
+                      <div style={{
+                        width: 24, height: 24, borderRadius: '50%',
+                        background: isToday ? '#2563eb' : 'transparent',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 13, fontWeight: isToday ? 700 : 500, color: isToday ? '#fff' : '#333', marginBottom: 4 }}>
+                        fontSize: 12, fontWeight: isToday ? 700 : 500,
+                        color: isToday ? '#fff' : '#333', marginBottom: 3,
+                      }}>
                         {dayNum}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {dayJobs.slice(0, 3).map(job => (
+                        {dayJobs.slice(0, 2).map(job => (
                           <div key={job.id} onClick={e => { e.stopPropagation(); setDetailJob(job); }}
-                            style={{ background: STATUS_COLORS[job.status] + '22', border: `1.5px solid ${STATUS_COLORS[job.status]}44`,
+                            style={{
+                              background: STATUS_COLORS[job.status] + '22',
+                              border: `1.5px solid ${STATUS_COLORS[job.status]}44`,
                               borderLeft: `3px solid ${STATUS_COLORS[job.status]}`,
-                              borderRadius: 4, padding: '2px 5px', fontSize: 11, cursor: 'pointer',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#333', fontWeight: 500 }}>
-                            {TYPE_ICONS[job.job_type]} {job.scheduled_time ? job.scheduled_time.slice(0,5) + ' ' : ''}{job.title}
+                              borderRadius: 4, padding: '2px 4px', fontSize: 10, cursor: 'pointer',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                              color: '#333', fontWeight: 500,
+                            }}>
+                            {TYPE_ICONS[job.job_type]} {job.title}
                           </div>
                         ))}
-                        {dayJobs.length > 3 && (
-                          <div style={{ fontSize: 11, color: '#888', paddingLeft: 4 }}>+{dayJobs.length - 3} more</div>
+                        {dayJobs.length > 2 && (
+                          <div style={{ fontSize: 10, color: '#888', paddingLeft: 4 }}>+{dayJobs.length - 2} more</div>
                         )}
                       </div>
                     </>
@@ -200,44 +215,50 @@ export default function Schedule() {
         </div>
       )}
 
-      {/* List View */}
+      {/* ── List View ── */}
       {view === 'list' && (
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading…</div>
           ) : jobs.length === 0 ? (
-            <div style={{ padding: 60, textAlign: 'center', color: '#aaa' }}>
+            <div style={{ padding: 48, textAlign: 'center', color: '#aaa' }}>
               <div style={{ fontSize: 36, marginBottom: 8 }}>📅</div>
               <p>No jobs scheduled for {MONTHS[month]} {year}</p>
               <button onClick={() => openCreate(dateStr(year, month, today.getDate()))}
-                style={{ marginTop: 8, padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ marginTop: 10, padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
                 Schedule First Job
               </button>
             </div>
           ) : (
             jobs.map((job, i) => (
-              <div key={job.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px',
-                borderBottom: i < jobs.length - 1 ? '1px solid #f1f5f9' : 'none',
-                background: '#fff', transition: 'background .1s' }}>
-                <div style={{ textAlign: 'center', minWidth: 52 }}>
-                  <div style={{ fontSize: 22 }}>{TYPE_ICONS[job.job_type]}</div>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{job.title}</div>
-                  <div style={{ fontSize: 12, color: '#888' }}>
-                    {job.company_name && <span>🏢 {job.company_name} · </span>}
-                    {job.technician && <span>👷 {job.technician} · </span>}
-                    {job.scheduled_date && <span>📅 {job.scheduled_date}{job.scheduled_time ? ' at ' + job.scheduled_time.slice(0,5) : ''}</span>}
+              <div key={job.id}
+                style={{ padding: '14px 16px', borderBottom: i < jobs.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                {/* Top row: icon + title + status */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ fontSize: 20, flexShrink: 0 }}>{TYPE_ICONS[job.job_type]}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{job.title}</div>
+                    <div style={{ fontSize: 12, color: '#888', marginTop: 3 }}>
+                      {job.company_name && <span>🏢 {job.company_name} · </span>}
+                      {job.technician && <span>👷 {job.technician} · </span>}
+                      {job.scheduled_date && <span>📅 {job.scheduled_date}{job.scheduled_time ? ' @ ' + job.scheduled_time.slice(0, 5) : ''}</span>}
+                    </div>
                   </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                  <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, flexShrink: 0,
                     background: STATUS_COLORS[job.status] + '22', color: STATUS_COLORS[job.status] }}>
                     {STATUS_LABELS[job.status]}
                   </span>
-                  <button onClick={e => openEdit(job, e)} style={{ padding: '4px 10px', fontSize: 12, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer' }}>Edit</button>
+                </div>
+                {/* Actions row */}
+                <div style={{ display: 'flex', gap: 8, marginTop: 10, paddingLeft: 32 }}>
+                  <button onClick={e => openEdit(job, e)}
+                    style={{ padding: '5px 14px', fontSize: 12, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontWeight: 500 }}>
+                    Edit
+                  </button>
                   <button onClick={async () => { await axios.delete(`/api/jobs/${job.id}`); fetchJobs(); }}
-                    style={{ padding: '4px 10px', fontSize: 12, background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 6, cursor: 'pointer' }}>Delete</button>
+                    style={{ padding: '5px 14px', fontSize: 12, background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 6, cursor: 'pointer', fontWeight: 500 }}>
+                    Delete
+                  </button>
                 </div>
               </div>
             ))
@@ -245,51 +266,55 @@ export default function Schedule() {
         </div>
       )}
 
-      {/* Week View */}
+      {/* ── Week View ── */}
       {view === 'week' && (
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            {Array.from({ length: 7 }, (_, i) => {
-              const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
-              const ds = dateStr(d.getFullYear(), d.getMonth(), d.getDate());
-              const todayDs = dateStr(today.getFullYear(), today.getMonth(), today.getDate());
-              return (
-                <div key={i} style={{ padding: '10px 8px', textAlign: 'center', background: ds === todayDs ? '#eff6ff' : '' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>{DAYS[d.getDay()]}</div>
-                  <div style={{ fontSize: 20, fontWeight: ds === todayDs ? 700 : 400, color: ds === todayDs ? '#2563eb' : '#333' }}>{d.getDate()}</div>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', minHeight: 300 }}>
-            {Array.from({ length: 7 }, (_, i) => {
-              const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
-              const ds = dateStr(d.getFullYear(), d.getMonth(), d.getDate());
-              const dayJobs = jobsForDate(ds);
-              return (
-                <div key={i} onClick={() => openCreate(ds)}
-                  style={{ padding: 8, borderRight: i < 6 ? '1px solid #e2e8f0' : 'none', minHeight: 200, cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {dayJobs.map(job => (
-                      <div key={job.id} onClick={e => { e.stopPropagation(); setDetailJob(job); }}
-                        style={{ background: STATUS_COLORS[job.status] + '22', borderLeft: `3px solid ${STATUS_COLORS[job.status]}`,
-                          borderRadius: 4, padding: '4px 6px', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}>
-                        {job.scheduled_time ? <span style={{ color: '#888', fontSize: 11 }}>{job.scheduled_time.slice(0,5)} </span> : null}
-                        {job.title}
-                      </div>
-                    ))}
+        <div className="cal-week-scroll" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+          <div className="cal-week-inner">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              {Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+                const ds = dateStr(d.getFullYear(), d.getMonth(), d.getDate());
+                const todayDs = dateStr(today.getFullYear(), today.getMonth(), today.getDate());
+                return (
+                  <div key={i} style={{ padding: '10px 6px', textAlign: 'center', background: ds === todayDs ? '#eff6ff' : '' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>{DAYS[d.getDay()]}</div>
+                    <div style={{ fontSize: 18, fontWeight: ds === todayDs ? 700 : 400, color: ds === todayDs ? '#2563eb' : '#333' }}>{d.getDate()}</div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', minHeight: 260 }}>
+              {Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+                const ds = dateStr(d.getFullYear(), d.getMonth(), d.getDate());
+                const dayJobs = jobsForDate(ds);
+                return (
+                  <div key={i} onClick={() => openCreate(ds)}
+                    style={{ padding: 6, borderRight: i < 6 ? '1px solid #e2e8f0' : 'none', minHeight: 200, cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {dayJobs.map(job => (
+                        <div key={job.id} onClick={e => { e.stopPropagation(); setDetailJob(job); }}
+                          style={{ background: STATUS_COLORS[job.status] + '22', borderLeft: `3px solid ${STATUS_COLORS[job.status]}`,
+                            borderRadius: 4, padding: '4px 5px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
+                          {job.scheduled_time ? <span style={{ color: '#888', fontSize: 10 }}>{job.scheduled_time.slice(0, 5)} </span> : null}
+                          {job.title}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Job Detail Popover */}
+      {/* ── Job Detail Sheet ── */}
       {detailJob && (
-        <div style={overlay} onClick={() => setDetailJob(null)}>
-          <div style={{ ...modal, maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+        <div className="sched-overlay" onClick={() => setDetailJob(null)}>
+          <div className="sched-modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            {/* Drag handle on mobile */}
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: '#ddd', margin: '0 auto 16px' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>
                 <div style={{ fontSize: 22 }}>{TYPE_ICONS[detailJob.job_type]}</div>
@@ -297,7 +322,7 @@ export default function Schedule() {
               </div>
               <button onClick={() => setDetailJob(null)} style={closeBtn}>✕</button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: '#555' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13, color: '#555' }}>
               <div><strong>Status:</strong> <span style={{ color: STATUS_COLORS[detailJob.status], fontWeight: 600 }}>{STATUS_LABELS[detailJob.status]}</span></div>
               {detailJob.company_name && <div><strong>Company:</strong> {detailJob.company_name}</div>}
               {detailJob.contact_name && <div><strong>Contact:</strong> {detailJob.contact_name}</div>}
@@ -307,15 +332,20 @@ export default function Schedule() {
               {detailJob.notes && <div><strong>Notes:</strong> {detailJob.notes}</div>}
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-              <button onClick={e => openEdit(detailJob, e)} style={{ flex: 1, padding: '8px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>Edit</button>
+              <button onClick={e => openEdit(detailJob, e)}
+                style={{ flex: 1, padding: '10px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                Edit Job
+              </button>
               <button onClick={async () => { await axios.delete(`/api/jobs/${detailJob.id}`); setDetailJob(null); fetchJobs(); }}
-                style={{ padding: '8px 14px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>Delete</button>
+                style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                Delete
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Create/Edit Modal */}
+      {/* ── Create / Edit Job Modal ── */}
       {showModal && (
         <JobModal
           job={editJob}
@@ -360,9 +390,11 @@ function JobModal({ job, defaultDate, companies, contacts, onSave, onClose }) {
   }
 
   return (
-    <div style={overlay} onClick={onClose}>
-      <div style={modal} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+    <div className="sched-overlay" onClick={onClose}>
+      <div className="sched-modal" onClick={e => e.stopPropagation()}>
+        {/* Drag handle */}
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: '#ddd', margin: '0 auto 16px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{job ? 'Edit Job' : 'New Job'}</h3>
           <button onClick={onClose} style={closeBtn}>✕</button>
         </div>
@@ -416,7 +448,7 @@ function JobModal({ job, defaultDate, companies, contacts, onSave, onClose }) {
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={lbl}>Notes</label>
-              <textarea style={{ ...inp, minHeight: 70, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Job notes, special instructions…" />
+              <textarea style={{ ...inp, minHeight: 68, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Job notes, special instructions…" />
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" id="is_reminder" checked={!!form.is_reminder} onChange={e => set('is_reminder', e.target.checked ? 1 : 0)} />
@@ -425,11 +457,11 @@ function JobModal({ job, defaultDate, companies, contacts, onSave, onClose }) {
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
             <button type="submit" disabled={saving}
-              style={{ flex: 1, padding: '10px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+              style={{ flex: 1, padding: '11px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
               {saving ? 'Saving…' : job ? 'Save Changes' : 'Create Job'}
             </button>
             <button type="button" onClick={onClose}
-              style={{ padding: '10px 18px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>
+              style={{ padding: '11px 18px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>
               Cancel
             </button>
           </div>
@@ -439,14 +471,6 @@ function JobModal({ job, defaultDate, companies, contacts, onSave, onClose }) {
   );
 }
 
-const overlay = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex',
-  alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20,
-};
-const modal = {
-  background: '#fff', borderRadius: 14, padding: 28, width: '100%', maxWidth: 560,
-  maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.3)',
-};
 const closeBtn = {
   background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#999', padding: 4,
 };
