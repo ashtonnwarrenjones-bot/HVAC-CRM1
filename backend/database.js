@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-const DB_PATH = path.join(__dirname, 'crm.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'crm.db');
 let _sqlDb = null;
 let _inTransaction = false;
 
@@ -210,6 +210,19 @@ const SCHEMA = `
     contact_name TEXT,
     subject TEXT DEFAULT 'Message from Customer',
     message TEXT NOT NULL,
+    read_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT,
+    entity_type TEXT,
+    entity_id INTEGER,
+    company_id INTEGER,
+    sales_rep_name TEXT,
     read_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -663,6 +676,9 @@ async function initDb() {
     'ALTER TABLE proposals ADD COLUMN signed_at TEXT',
     'ALTER TABLE proposals ADD COLUMN signed_by TEXT',
     'ALTER TABLE users ADD COLUMN role TEXT DEFAULT "admin"',
+    'ALTER TABLE companies ADD COLUMN sales_rep_name TEXT',
+    'ALTER TABLE companies ADD COLUMN sales_rep_email TEXT',
+    'ALTER TABLE companies ADD COLUMN sales_rep_phone TEXT',
   ];
   migrations.forEach(sql => {
     try { _sqlDb.run(sql); } catch (_) {}
@@ -675,6 +691,15 @@ async function initDb() {
   return db;
 }
 
+function createNotification({ type, title, message, entity_type, entity_id, company_id, sales_rep_name }) {
+  try {
+    db.prepare(
+      'INSERT INTO notifications (type, title, message, entity_type, entity_id, company_id, sales_rep_name) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(type, title, message || null, entity_type || null, entity_id || null, company_id || null, sales_rep_name || null);
+  } catch (_) {}
+}
+
 module.exports = db;
 module.exports.initDb = initDb;
 module.exports.seedDemoData = seedDemoData;
+module.exports.createNotification = createNotification;
