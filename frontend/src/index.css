@@ -378,4 +378,5 @@ td.actions { display: flex; gap: 8px; }
   .stats-grid { gap: 8px; }
   .stat-card .stat-value { font-size: 19px; }
   .sched-page { padding: 8px; }
+  .hide-xs { display: none !important; }
 }

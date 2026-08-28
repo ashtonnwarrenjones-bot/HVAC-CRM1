@@ -35,10 +35,10 @@ export default function Pipeline() {
   const [form, setForm] = useState(EMPTY);
   const [editId, setEditId] = useState(null);
   const [lostReason, setLostReason] = useState('');
-  const [pendingLost, setPendingLost] = useState(null); // { dealId }
+  const [pendingLost, setPendingLost] = useState(null);
   const [dragging, setDragging] = useState(null);
   const [dragOver, setDragOver] = useState(null);
-  const [view, setView] = useState('kanban'); // 'kanban' | 'list'
+  const [view, setView] = useState('kanban'); // 'kanban' | 'cards' | 'list'
 
   const load = () => axios.get('/api/deals').then(r => setDeals(r.data));
 
@@ -62,10 +62,16 @@ export default function Pipeline() {
     });
   };
 
-  const openAdd = (stage = 'lead') => { setForm({ ...EMPTY, stage, probability: String(STAGES.find(s => s.key === stage)?.prob ?? 10) }); setEditId(null); setShowModal(true); };
+  const openAdd = (stage = 'lead') => {
+    setForm({ ...EMPTY, stage, probability: String(STAGES.find(s => s.key === stage)?.prob ?? 10) });
+    setEditId(null);
+    setShowModal(true);
+  };
+
   const openEdit = (d) => {
     setForm({ ...d, value: String(d.value || ''), probability: String(d.probability || ''), company_id: d.company_id || '', contact_id: d.contact_id || '', close_date: d.close_date || '' });
-    setEditId(d.id); setShowModal(true);
+    setEditId(d.id);
+    setShowModal(true);
   };
 
   const save = async () => {
@@ -99,7 +105,6 @@ export default function Pipeline() {
     load();
   };
 
-  // Drag-and-drop
   const onDragStart = (e, deal) => { setDragging(deal); e.dataTransfer.effectAllowed = 'move'; };
   const onDragOver = (e, stageKey) => { e.preventDefault(); setDragOver(stageKey); };
   const onDrop = (e, stageKey) => {
@@ -109,30 +114,94 @@ export default function Pipeline() {
     setDragging(null);
   };
 
-  // Stats
-  const activePipeline = deals.filter(d => !['won','lost'].includes(d.stage));
+  const activePipeline = deals.filter(d => !['won', 'lost'].includes(d.stage));
   const totalPipeline = activePipeline.reduce((s, d) => s + (d.value || 0), 0);
   const weightedPipeline = activePipeline.reduce((s, d) => s + (d.value || 0) * (d.probability || 0) / 100, 0);
   const totalWon = deals.filter(d => d.stage === 'won').reduce((s, d) => s + (d.value || 0), 0);
 
+  // Deal card used in both kanban and cards view
+  function DealCard({ deal, stage, compact }) {
+    return (
+      <div
+        draggable={!compact}
+        onDragStart={compact ? undefined : e => onDragStart(e, deal)}
+        style={{
+          background: 'white', borderRadius: 8, padding: compact ? '12px 14px' : '10px 12px',
+          marginBottom: 8, boxShadow: '0 1px 4px rgba(0,0,0,.09)',
+          cursor: compact ? 'default' : 'grab',
+          borderLeft: `3px solid ${stage.color}`,
+          opacity: dragging?.id === deal.id ? .5 : 1,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, color: '#1d4ed8', cursor: 'pointer', marginBottom: 2 }}
+              onClick={() => openEdit(deal)}>
+              {deal.title}
+            </div>
+            {deal.company_name && (
+              <div style={{ fontSize: 12, color: '#6b7280' }}>🏢 {deal.company_name}</div>
+            )}
+          </div>
+          {deal.value > 0 && (
+            <div style={{ fontSize: 13, fontWeight: 700, color: stage.color, flexShrink: 0 }}>{fmt(deal.value)}</div>
+          )}
+        </div>
+        {deal.close_date && (
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+            📅 Close: {new Date(deal.close_date + 'T12:00:00').toLocaleDateString()}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+          {STAGES.filter(s => s.key !== stage.key && s.key !== 'lost').slice(0, compact ? 2 : 2).map(s => (
+            <button key={s.key} onClick={() => moveStage(deal.id, s.key)}
+              style={{ fontSize: 10, padding: '3px 7px', borderRadius: 4, background: s.color + '18', color: s.color, border: `1px solid ${s.color}44`, cursor: 'pointer', fontWeight: 600 }}>
+              → {s.label.replace(' ✓', '').replace(' ✗', '')}
+            </button>
+          ))}
+          {stage.key !== 'lost' && stage.key !== 'won' && (
+            <button onClick={() => moveStage(deal.id, 'lost')}
+              style={{ fontSize: 10, padding: '3px 7px', borderRadius: 4, background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', cursor: 'pointer', fontWeight: 600 }}>
+              Lost
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-      <div className="page-header">
+      {/* ── Page header ── */}
+      <div className="page-header" style={{ flexWrap: 'wrap', gap: 8 }}>
         <h2>Pipeline</h2>
-        <div className="flex gap-2">
-          <button className={`btn ${view === 'kanban' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setView('kanban')}>📋 Kanban</button>
-          <button className={`btn ${view === 'list' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setView('list')}>📃 List</button>
-          <button className="btn btn-primary" onClick={() => openAdd()}>+ New Deal</button>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* View toggle */}
+          <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 6, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+            {[
+              { key: 'kanban', icon: '📋', label: 'Kanban' },
+              { key: 'cards', icon: '🗂️', label: 'Cards' },
+              { key: 'list', icon: '📃', label: 'List' },
+            ].map(v => (
+              <button key={v.key} onClick={() => setView(v.key)}
+                style={{ padding: '6px 10px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500,
+                  background: view === v.key ? '#2563eb' : 'transparent',
+                  color: view === v.key ? '#fff' : '#555', transition: 'all .15s', whiteSpace: 'nowrap' }}>
+                {v.icon} <span className="hide-xs">{v.label}</span>
+              </button>
+            ))}
+          </div>
+          <button className="btn btn-primary" onClick={() => openAdd()} style={{ fontSize: 13 }}>+ New Deal</button>
         </div>
       </div>
 
       <div className="page-content">
-        {/* Pipeline stats */}
+        {/* Stats */}
         <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
           <div className="stat-card">
             <div className="stat-label">Open Pipeline</div>
             <div className="stat-value" style={{ color: 'var(--blue-700)' }}>{fmt(totalPipeline)}</div>
-            <div className="stat-sub">{activePipeline.length} active deals</div>
+            <div className="stat-sub">{activePipeline.length} active deal{activePipeline.length !== 1 ? 's' : ''}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Weighted Value</div>
@@ -142,100 +211,100 @@ export default function Pipeline() {
           <div className="stat-card">
             <div className="stat-label">Won This Period</div>
             <div className="stat-value" style={{ color: 'var(--green-600)' }}>{fmt(totalWon)}</div>
-            <div className="stat-sub">{deals.filter(d => d.stage === 'won').length} deals</div>
+            <div className="stat-sub">{deals.filter(d => d.stage === 'won').length} deals closed</div>
           </div>
         </div>
 
-        {/* KANBAN VIEW */}
+        {/* ── KANBAN VIEW ── */}
         {view === 'kanban' && (
-          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}>
-            {STAGES.map(stage => {
-              const colDeals = deals.filter(d => d.stage === stage.key);
-              const colTotal = colDeals.reduce((s, d) => s + (d.value || 0), 0);
-              const isOver = dragOver === stage.key;
-              return (
-                <div key={stage.key}
-                  style={{ minWidth: 220, width: 220, flexShrink: 0 }}
-                  onDragOver={e => onDragOver(e, stage.key)}
-                  onDrop={e => onDrop(e, stage.key)}
-                  onDragLeave={() => setDragOver(null)}
-                >
-                  {/* Column header */}
-                  <div style={{
-                    background: stage.color, color: 'white', borderRadius: '6px 6px 0 0',
-                    padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                  }}>
-                    <span style={{ fontWeight: 700, fontSize: 13 }}>{stage.label}</span>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 11, opacity: .8 }}>{colDeals.length} deal{colDeals.length !== 1 ? 's' : ''}</div>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmt(colTotal)}</div>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minWidth: 'max-content' }}>
+              {STAGES.map(stage => {
+                const colDeals = deals.filter(d => d.stage === stage.key);
+                const colTotal = colDeals.reduce((s, d) => s + (d.value || 0), 0);
+                const isOver = dragOver === stage.key;
+                return (
+                  <div key={stage.key}
+                    style={{ width: 220, flexShrink: 0 }}
+                    onDragOver={e => onDragOver(e, stage.key)}
+                    onDrop={e => onDrop(e, stage.key)}
+                    onDragLeave={() => setDragOver(null)}
+                  >
+                    <div style={{
+                      background: stage.color, color: 'white', borderRadius: '8px 8px 0 0',
+                      padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                    }}>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{stage.label}</span>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 11, opacity: .8 }}>{colDeals.length} deal{colDeals.length !== 1 ? 's' : ''}</div>
+                        <div style={{ fontSize: 12, fontWeight: 600 }}>{fmt(colTotal)}</div>
+                      </div>
+                    </div>
+                    <div style={{
+                      background: isOver ? '#dbeafe' : '#f3f4f6', borderRadius: '0 0 8px 8px',
+                      minHeight: 80, padding: 8,
+                      border: `2px solid ${isOver ? '#2563eb' : 'transparent'}`,
+                      transition: 'background .15s, border-color .15s'
+                    }}>
+                      {colDeals.map(deal => (
+                        <DealCard key={deal.id} deal={deal} stage={stage} compact={false} />
+                      ))}
+                      {!['won', 'lost'].includes(stage.key) && (
+                        <button onClick={() => openAdd(stage.key)}
+                          style={{ width: '100%', padding: '6px', border: '1px dashed #d1d5db', borderRadius: 6, background: 'transparent', color: '#9ca3af', cursor: 'pointer', fontSize: 12 }}>
+                          + Add deal
+                        </button>
+                      )}
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-                  {/* Cards */}
-                  <div style={{
-                    background: isOver ? '#dbeafe' : '#f3f4f6', borderRadius: '0 0 6px 6px',
-                    minHeight: 80, padding: 8, border: `2px solid ${isOver ? '#2563eb' : 'transparent'}`,
-                    transition: 'background .15s, border-color .15s'
-                  }}>
-                    {colDeals.map(deal => (
-                      <div key={deal.id}
-                        draggable
-                        onDragStart={e => onDragStart(e, deal)}
-                        style={{
-                          background: 'white', borderRadius: 6, padding: '10px 12px',
-                          marginBottom: 8, boxShadow: '0 1px 3px rgba(0,0,0,.1)',
-                          cursor: 'grab', borderLeft: `3px solid ${stage.color}`,
-                          opacity: dragging?.id === deal.id ? .5 : 1
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}
-                          className="link-style" onClick={() => openEdit(deal)}>
-                          {deal.title}
-                        </div>
-                        {deal.company_name && (
-                          <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>🏢 {deal.company_name}</div>
-                        )}
-                        {deal.value > 0 && (
-                          <div style={{ fontSize: 13, fontWeight: 700, color: stage.color, marginTop: 4 }}>{fmt(deal.value)}</div>
-                        )}
-                        {deal.close_date && (
-                          <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 2 }}>
-                            Close: {new Date(deal.close_date + 'T12:00:00').toLocaleDateString()}
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
-                          {STAGES.filter(s => s.key !== stage.key && s.key !== 'lost').slice(0, 2).map(s => (
-                            <button key={s.key} onClick={() => moveStage(deal.id, s.key)}
-                              style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: s.color + '22', color: s.color, border: `1px solid ${s.color}55`, cursor: 'pointer', fontWeight: 600 }}>
-                              → {s.label.replace(' ✓','').replace(' ✗','')}
-                            </button>
-                          ))}
-                          {stage.key !== 'lost' && stage.key !== 'won' && (
-                            <button onClick={() => moveStage(deal.id, 'lost')}
-                              style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', cursor: 'pointer', fontWeight: 600 }}>
-                              Lost
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Add deal button */}
-                    {!['won','lost'].includes(stage.key) && (
+        {/* ── CARDS VIEW (mobile-friendly grouped list) ── */}
+        {view === 'cards' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {STAGES.map(stage => {
+              const colDeals = deals.filter(d => d.stage === stage.key);
+              if (colDeals.length === 0 && ['won', 'lost'].includes(stage.key)) return null;
+              const colTotal = colDeals.reduce((s, d) => s + (d.value || 0), 0);
+              return (
+                <div key={stage.key}>
+                  {/* Stage header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: stage.color, flexShrink: 0 }} />
+                    <span style={{ fontWeight: 700, fontSize: 14, color: stage.color }}>{stage.label}</span>
+                    <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                      {colDeals.length} deal{colDeals.length !== 1 ? 's' : ''}
+                      {colTotal > 0 ? ` · ${fmt(colTotal)}` : ''}
+                    </span>
+                    {!['won', 'lost'].includes(stage.key) && (
                       <button onClick={() => openAdd(stage.key)}
-                        style={{ width: '100%', padding: '6px', border: '1px dashed #d1d5db', borderRadius: 6, background: 'transparent', color: 'var(--gray-400)', cursor: 'pointer', fontSize: 12 }}>
-                        + Add deal
+                        style={{ marginLeft: 'auto', fontSize: 11, padding: '3px 10px', background: stage.color + '18', color: stage.color, border: `1px solid ${stage.color}44`, borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
+                        + Add
                       </button>
                     )}
                   </div>
+                  {colDeals.length === 0 ? (
+                    <div style={{ padding: '12px 16px', background: '#f9fafb', border: '1px dashed #e5e7eb', borderRadius: 8, fontSize: 13, color: '#9ca3af', textAlign: 'center' }}>
+                      No deals in this stage
+                    </div>
+                  ) : (
+                    <div>
+                      {colDeals.map(deal => (
+                        <DealCard key={deal.id} deal={deal} stage={stage} compact={true} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
 
-        {/* LIST VIEW */}
+        {/* ── LIST VIEW ── */}
         {view === 'list' && (
           <div className="card">
             <div className="table-wrap">
@@ -246,7 +315,7 @@ export default function Pipeline() {
                     <th>Company</th>
                     <th>Service</th>
                     <th>Value</th>
-                    <th>Prob %</th>
+                    <th>Prob</th>
                     <th>Stage</th>
                     <th>Close Date</th>
                     <th>Actions</th>
@@ -254,12 +323,15 @@ export default function Pipeline() {
                 </thead>
                 <tbody>
                   {deals.length === 0 ? (
-                    <tr><td colSpan="8" style={{ textAlign: 'center', padding: 24, color: 'var(--gray-400)' }}>No deals yet</td></tr>
+                    <tr><td colSpan="8" style={{ textAlign: 'center', padding: 24, color: '#9ca3af' }}>No deals yet</td></tr>
                   ) : deals.map(d => {
                     const stg = STAGES.find(s => s.key === d.stage);
                     return (
                       <tr key={d.id}>
-                        <td><span className="link-style font-bold" style={{ cursor: 'pointer' }} onClick={() => openEdit(d)}>{d.title}</span></td>
+                        <td>
+                          <span className="link-style font-bold" style={{ cursor: 'pointer' }} onClick={() => openEdit(d)}>{d.title}</span>
+                          {d.notes && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{d.notes.slice(0, 60)}{d.notes.length > 60 ? '…' : ''}</div>}
+                        </td>
                         <td>{d.company_id ? <Link to={`/companies/${d.company_id}`} className="link-style">{d.company_name}</Link> : '—'}</td>
                         <td className="text-muted">{d.service_type || '—'}</td>
                         <td className="font-bold">{fmt(d.value)}</td>
@@ -286,7 +358,7 @@ export default function Pipeline() {
         )}
       </div>
 
-      {/* Add/Edit Deal Modal */}
+      {/* ── Add/Edit Deal Modal ── */}
       {showModal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal modal-lg">
@@ -357,7 +429,7 @@ export default function Pipeline() {
         </div>
       )}
 
-      {/* Lost Reason Modal */}
+      {/* ── Lost Reason Modal ── */}
       {showLostModal && (
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 420 }}>
@@ -368,7 +440,7 @@ export default function Pipeline() {
               <div className="form-group">
                 <label className="form-label">Reason lost (optional)</label>
                 <input className="form-control" value={lostReason} onChange={e => setLostReason(e.target.value)}
-                  placeholder="Price, timing, competitor, no budget..." />
+                  placeholder="Price, timing, competitor, no budget..." autoFocus />
               </div>
             </div>
             <div className="modal-footer">

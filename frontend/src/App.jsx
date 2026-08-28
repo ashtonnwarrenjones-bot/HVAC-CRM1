@@ -11,6 +11,7 @@ import ProposalDetail from './pages/ProposalDetail';
 import Pipeline from './pages/Pipeline';
 import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
+import Analytics from './pages/Analytics';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '📊', exact: true },
@@ -19,6 +20,7 @@ const NAV = [
   { to: '/companies', label: 'Companies', icon: '🏢' },
   { to: '/contacts', label: 'Contacts', icon: '👤' },
   { to: '/proposals', label: 'Proposals', icon: '📋' },
+  { to: '/analytics', label: 'Analytics', icon: '📈' },
 ];
 
 function AppLayout() {
@@ -97,7 +99,7 @@ function AppLayout() {
           </button>
         </div>
         <div style={{ padding: '8px 16px 12px', fontSize: 11, color: 'rgba(255,255,255,.3)' }}>
-          v3.1 • HVAC & Plumbing CRM
+          v3.2 • HVAC & Plumbing CRM
         </div>
       </nav>
 
@@ -112,6 +114,7 @@ function AppLayout() {
           <Route path="/contacts" element={<Contacts />} />
           <Route path="/proposals" element={<Proposals />} />
           <Route path="/proposals/:id" element={<ProposalDetail />} />
+          <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
