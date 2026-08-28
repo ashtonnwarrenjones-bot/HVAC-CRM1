@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import Logo from '../components/Logo';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -52,9 +53,8 @@ export default function Sign() {
     <div style={{ minHeight: '100vh', background: '#f3f4f6', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
       {/* Header bar */}
-      <div style={{ background: '#1e3a5f', padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ fontSize: 22 }}>🔧</span>
-        <span style={{ color: '#fff', fontWeight: 700, fontSize: 17 }}>HVAC CRM · Proposal Signing</span>
+      <div style={{ background: '#1e3a5f', padding: '14px 24px' }}>
+        <Logo size={34} variant="white" subtitle="Proposal Signing" />
       </div>
 
       <div style={{ maxWidth: 680, margin: '32px auto', padding: '0 16px' }}>

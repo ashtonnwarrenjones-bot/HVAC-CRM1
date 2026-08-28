@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import Logo from './components/Logo';
 import Login from './pages/Login';
 import Sign from './pages/Sign';
 import Dashboard from './pages/Dashboard';
@@ -37,7 +38,7 @@ function AppLayout() {
 
       {/* ── Mobile top bar ── */}
       <div className="mobile-header">
-        <span className="mobile-logo">🔧 HVAC CRM</span>
+        <div className="mobile-logo"><Logo size={30} variant="white" subtitle={null} /></div>
         <button
           className="mobile-hamburger"
           onClick={() => setMenuOpen(o => !o)}
@@ -56,8 +57,7 @@ function AppLayout() {
       {/* ── Sidebar ── */}
       <nav className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-logo">
-          <h1>🔧 HVAC CRM</h1>
-          <span>Commercial Services</span>
+          <Logo size={36} variant="white" subtitle="Field Service CRM" />
         </div>
         <div className="sidebar-nav">
           {NAV.map(({ to, label, icon, exact }) => (
@@ -100,7 +100,7 @@ function AppLayout() {
           </button>
         </div>
         <div style={{ padding: '8px 16px 12px', fontSize: 11, color: 'rgba(255,255,255,.3)' }}>
-          v3.2 • HVAC & Plumbing CRM
+          v3.3 • Conduit
         </div>
       </nav>
 
