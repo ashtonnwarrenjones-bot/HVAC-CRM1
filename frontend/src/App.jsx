@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
+import Sign from './pages/Sign';
 import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
 import CompanyDetail from './pages/CompanyDetail';
@@ -127,7 +128,12 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AppLayout />
+        <Routes>
+          {/* Public signing page — no auth required */}
+          <Route path="/sign/:token" element={<Sign />} />
+          {/* All other routes go through the authenticated layout */}
+          <Route path="/*" element={<AppLayout />} />
+        </Routes>
       </BrowserRouter>
     </AuthProvider>
   );

@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import EmailCompose from '../components/EmailCompose';
+
+const API = import.meta.env.VITE_API_URL ?? '';
 
 const ACTIVITY_TYPES = [
   'note', 'call', 'email', 'visit', 'quote', 'service', 'meeting_summary'
@@ -32,6 +34,17 @@ const CONTACT_EMPTY = {
 
 const NOTE_EMPTY = { type: 'note', subject: '', body: '' };
 
+function taskDueLabel(due_date) {
+  if (!due_date) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const due = new Date(due_date + 'T00:00:00');
+  const diff = Math.round((due - today) / 86400000);
+  if (diff < 0)  return { label: `${Math.abs(diff)}d overdue`, color: '#ef4444', bg: '#fee2e2' };
+  if (diff === 0) return { label: 'Due today',    color: '#d97706', bg: '#fef3c7' };
+  if (diff === 1) return { label: 'Due tomorrow', color: '#2563eb', bg: '#dbeafe' };
+  return { label: `Due in ${diff}d`, color: '#6b7280', bg: '#f3f4f6' };
+}
+
 export default function CompanyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -45,8 +58,23 @@ export default function CompanyDetail() {
   const [activityFilter, setActivityFilter] = useState('all');
   const [expandedActivity, setExpandedActivity] = useState(null);
 
-  const load = () => axios.get(`/api/companies/${id}`).then(r => setCompany(r.data));
-  useEffect(() => { load(); }, [id]);
+  // Attachments state
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef();
+
+  // Tasks state
+  const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState('');
+  const [newTaskDue, setNewTaskDue] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState('normal');
+  const [addingTask, setAddingTask] = useState(false);
+
+  const load = useCallback(() => axios.get(`/api/companies/${id}`).then(r => setCompany(r.data)), [id]);
+  const loadAttachments = useCallback(() => axios.get(`/api/attachments?company_id=${id}`).then(r => setAttachments(r.data)), [id]);
+  const loadTasks = useCallback(() => axios.get(`/api/tasks?company_id=${id}`).then(r => setTasks(r.data)), [id]);
+
+  useEffect(() => { load(); loadAttachments(); loadTasks(); }, [load, loadAttachments, loadTasks]);
 
   const saveContact = async () => {
     const data = { ...contactForm, company_id: id };
@@ -77,8 +105,55 @@ export default function CompanyDetail() {
     setShowNoteModal(true);
   };
 
+  // Attachment handlers
+  const uploadFile = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    setUploading(true);
+    const form = new FormData();
+    form.append('file', file);
+    form.append('company_id', id);
+    try {
+      await axios.post('/api/attachments', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      loadAttachments();
+    } catch { alert('Upload failed.'); }
+    finally { setUploading(false); e.target.value = ''; }
+  };
+
+  const deleteAttachment = async (attId) => {
+    if (!confirm('Remove this file?')) return;
+    await axios.delete(`/api/attachments/${attId}`);
+    setAttachments(a => a.filter(x => x.id !== attId));
+  };
+
+  // Task handlers
+  const addTask = async () => {
+    if (!newTask.trim()) return;
+    setAddingTask(true);
+    try {
+      const r = await axios.post('/api/tasks', { company_id: id, title: newTask.trim(), due_date: newTaskDue || null, priority: newTaskPriority });
+      setTasks(ts => [r.data, ...ts]);
+      setNewTask(''); setNewTaskDue(''); setNewTaskPriority('normal');
+    } finally { setAddingTask(false); }
+  };
+
+  const completeTask = async (taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    await axios.put(`/api/tasks/${taskId}`, { ...task, completed: !task.completed });
+    loadTasks();
+  };
+
+  const deleteTask = async (taskId) => {
+    if (!confirm('Delete this task?')) return;
+    await axios.delete(`/api/tasks/${taskId}`);
+    setTasks(ts => ts.filter(t => t.id !== taskId));
+  };
+
   const cf = (k) => e => setContactForm(p => ({ ...p, [k]: k === 'is_primary' ? e.target.checked : e.target.value }));
   const fmt = (n) => '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0 });
+  const fmtSize = (bytes) => bytes > 1048576 ? `${(bytes/1048576).toFixed(1)} MB` : `${Math.round(bytes/1024)} KB`;
+
+  const openTasks = tasks.filter(t => !t.completed);
+  const completedTasks = tasks.filter(t => t.completed);
 
   if (!company) return <div className="page-content"><p className="text-muted">Loading…</p></div>;
 
@@ -105,6 +180,7 @@ export default function CompanyDetail() {
         </div>
         <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
           <button className="btn btn-secondary" onClick={() => openNoteModal('meeting_summary')}>📋 Log Meeting</button>
+          <button className="btn btn-secondary" onClick={() => openNoteModal('email')}>✉️ Log Email</button>
           <button className="btn btn-secondary" onClick={() => openNoteModal('note')}>+ Activity</button>
           <button className="btn btn-secondary" onClick={() => setShowEmail(true)}>✉ Email</button>
           <Link to={`/proposals?company=${id}`} className="btn btn-primary">+ Proposal</Link>
@@ -185,6 +261,45 @@ export default function CompanyDetail() {
                 </div>
               )}
             </div>
+          {/* Attachments */}
+            <div className="card mt-4">
+              <div className="card-header">
+                <h3>📎 Files ({attachments.length})</h3>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #d1d5db', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {uploading ? 'Uploading…' : '+ Upload'}
+                </button>
+                <input ref={fileRef} type="file" hidden onChange={uploadFile} />
+              </div>
+              {attachments.length === 0 ? (
+                <div style={{ padding: '16px 18px', color: '#9ca3af', fontSize: 13 }}>
+                  No files yet — upload contracts, photos, or documents.
+                </div>
+              ) : (
+                <div>
+                  {attachments.map(att => (
+                    <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                      <span style={{ fontSize: 18, flexShrink: 0 }}>
+                        {att.mimetype?.startsWith('image/') ? '🖼️' : att.mimetype === 'application/pdf' ? '📄' : '📎'}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{att.original_name}</div>
+                        <div style={{ fontSize: 11, color: '#9ca3af' }}>{fmtSize(att.size)} · {new Date(att.uploaded_at).toLocaleDateString()}</div>
+                      </div>
+                      <a href={`${API}/api/attachments/${att.id}/download`}
+                        style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid #d1d5db', background: '#fff', fontSize: 11, color: '#374151', textDecoration: 'none' }}>
+                        ⬇
+                      </a>
+                      <button onClick={() => deleteAttachment(att.id)}
+                        style={{ padding: '4px 8px', borderRadius: 5, border: 'none', background: '#fee2e2', color: '#dc2626', fontSize: 11, cursor: 'pointer' }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── Right column ── */}
@@ -212,6 +327,77 @@ export default function CompanyDetail() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+
+            {/* ── Tasks ── */}
+            <div className="card mb-4">
+              <div className="card-header">
+                <h3>✅ Tasks ({openTasks.length} open)</h3>
+              </div>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <input
+                    type="text" placeholder="New task…" value={newTask}
+                    onChange={e => setNewTask(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addTask()}
+                    style={{ flex: 1, minWidth: 120, padding: '6px 10px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 13, outline: 'none' }}
+                  />
+                  <input
+                    type="date" value={newTaskDue} onChange={e => setNewTaskDue(e.target.value)}
+                    style={{ width: 120, padding: '6px 8px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 12, outline: 'none' }}
+                  />
+                  <select value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value)}
+                    style={{ padding: '6px 8px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 12, outline: 'none' }}>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="low">Low</option>
+                  </select>
+                  <button onClick={addTask} disabled={addingTask || !newTask.trim()}
+                    style={{ padding: '6px 12px', borderRadius: 7, border: 'none', background: '#1e3a5f', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    + Add
+                  </button>
+                </div>
+              </div>
+              {tasks.length === 0 ? (
+                <div style={{ padding: '16px 18px', color: '#9ca3af', fontSize: 13 }}>No tasks yet.</div>
+              ) : (
+                <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                  {[...openTasks, ...completedTasks].map(task => {
+                    const due = taskDueLabel(task.due_date);
+                    return (
+                      <div key={task.id} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 9, padding: '9px 16px',
+                        borderBottom: '1px solid #f3f4f6',
+                        opacity: task.completed ? 0.55 : 1,
+                        background: task.completed ? '#fafafa' : 'white',
+                      }}>
+                        <button onClick={() => completeTask(task.id)} title={task.completed ? 'Reopen' : 'Complete'}
+                          style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${task.completed ? '#10b981' : '#d1d5db'}`, background: task.completed ? '#10b981' : '#fff', cursor: 'pointer', flexShrink: 0, marginTop: 2, color: '#fff', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {task.completed ? '✓' : ''}
+                        </button>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#111827', textDecoration: task.completed ? 'line-through' : 'none', display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+                            {task.priority === 'high' && !task.completed && (
+                              <span style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>HIGH</span>
+                            )}
+                            {task.title}
+                          </div>
+                          {due && !task.completed && (
+                            <span style={{ fontSize: 11, fontWeight: 600, color: due.color, background: due.bg, borderRadius: 4, padding: '1px 6px', marginTop: 3, display: 'inline-block' }}>
+                              {due.label}
+                            </span>
+                          )}
+                          {task.completed && task.completed_at && (
+                            <div style={{ fontSize: 11, color: '#9ca3af' }}>Completed {new Date(task.completed_at).toLocaleDateString()}</div>
+                          )}
+                        </div>
+                        <button onClick={() => deleteTask(task.id)}
+                          style={{ padding: '2px 7px', borderRadius: 5, border: 'none', background: '#fee2e2', color: '#dc2626', fontSize: 11, cursor: 'pointer' }}>✕</button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
