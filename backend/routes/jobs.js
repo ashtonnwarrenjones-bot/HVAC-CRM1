@@ -68,6 +68,26 @@ router.post('/', (req, res) => {
       notes || null, is_reminder ? 1 : 0
     );
     const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(result.lastInsertRowid);
+
+    // Notify sales rep if company has one
+    if (company_id) {
+      try {
+        const { createNotification } = require('../database');
+        const company = db.prepare('SELECT name, sales_rep_name FROM companies WHERE id = ?').get(company_id);
+        if (company && company.sales_rep_name) {
+          createNotification({
+            type: 'job_scheduled',
+            title: `📅 Job Scheduled: ${title}`,
+            message: `${scheduled_date ? `For ${scheduled_date}` : 'New job'} at ${company.name} — Rep: ${company.sales_rep_name}`,
+            entity_type: 'job',
+            entity_id: result.lastInsertRowid,
+            company_id: company_id,
+            sales_rep_name: company.sales_rep_name,
+          });
+        }
+      } catch (_) {}
+    }
+
     res.status(201).json(job);
   } catch (e) {
     res.status(500).json({ error: e.message });

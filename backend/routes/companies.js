@@ -54,18 +54,21 @@ router.post('/', (req, res) => {
   const {
     name, address, city, state, zip, phone, website,
     property_type, contract_type, num_hvac_units,
-    num_plumbing_fixtures, annual_revenue, notes
+    num_plumbing_fixtures, annual_revenue, notes,
+    sales_rep_name, sales_rep_email, sales_rep_phone
   } = req.body;
 
   if (!name) return res.status(400).json({ error: 'Company name is required' });
 
   const result = db.prepare(`
     INSERT INTO companies (name, address, city, state, zip, phone, website,
-      property_type, contract_type, num_hvac_units, num_plumbing_fixtures, annual_revenue, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      property_type, contract_type, num_hvac_units, num_plumbing_fixtures, annual_revenue, notes,
+      sales_rep_name, sales_rep_email, sales_rep_phone)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(name, address, city, state || 'CO', zip, phone, website,
     property_type || 'commercial', contract_type || 'prospect',
-    num_hvac_units, num_plumbing_fixtures, annual_revenue, notes);
+    num_hvac_units, num_plumbing_fixtures, annual_revenue, notes,
+    sales_rep_name || null, sales_rep_email || null, sales_rep_phone || null);
 
   const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(company);
@@ -76,7 +79,8 @@ router.put('/:id', (req, res) => {
   const {
     name, address, city, state, zip, phone, website,
     property_type, contract_type, num_hvac_units,
-    num_plumbing_fixtures, annual_revenue, notes
+    num_plumbing_fixtures, annual_revenue, notes,
+    sales_rep_name, sales_rep_email, sales_rep_phone
   } = req.body;
 
   db.prepare(`
@@ -84,11 +88,13 @@ router.put('/:id', (req, res) => {
       name = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, website = ?,
       property_type = ?, contract_type = ?, num_hvac_units = ?,
       num_plumbing_fixtures = ?, annual_revenue = ?, notes = ?,
+      sales_rep_name = ?, sales_rep_email = ?, sales_rep_phone = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(name, address, city, state, zip, phone, website,
     property_type, contract_type, num_hvac_units,
     num_plumbing_fixtures, annual_revenue, notes,
+    sales_rep_name || null, sales_rep_email || null, sales_rep_phone || null,
     req.params.id);
 
   const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.id);

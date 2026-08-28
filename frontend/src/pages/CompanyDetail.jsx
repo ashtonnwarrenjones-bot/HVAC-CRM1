@@ -75,6 +75,10 @@ export default function CompanyDetail() {
   const [inviting, setInviting] = useState(null); // contact_id being invited
   const [inviteCopied, setInviteCopied] = useState(false);
 
+  // Sales rep state
+  const [editingRep, setEditingRep] = useState(false);
+  const [repForm, setRepForm] = useState({ sales_rep_name: '', sales_rep_email: '', sales_rep_phone: '' });
+
   const load = useCallback(() => axios.get(`/api/companies/${id}`).then(r => setCompany(r.data)), [id]);
   const loadAttachments = useCallback(() => axios.get(`/api/attachments?company_id=${id}`).then(r => setAttachments(r.data)), [id]);
   const loadTasks = useCallback(() => axios.get(`/api/tasks?company_id=${id}`).then(r => setTasks(r.data)), [id]);
@@ -172,6 +176,17 @@ export default function CompanyDetail() {
     setTasks(ts => ts.filter(t => t.id !== taskId));
   };
 
+  const openEditRep = () => {
+    setRepForm({ sales_rep_name: company.sales_rep_name || '', sales_rep_email: company.sales_rep_email || '', sales_rep_phone: company.sales_rep_phone || '' });
+    setEditingRep(true);
+  };
+
+  const saveRep = async () => {
+    await axios.put(`/api/companies/${id}`, { ...company, ...repForm });
+    setEditingRep(false);
+    load();
+  };
+
   const cf = (k) => e => setContactForm(p => ({ ...p, [k]: k === 'is_primary' ? e.target.checked : e.target.value }));
   const fmt = (n) => '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0 });
   const fmtSize = (bytes) => bytes > 1048576 ? `${(bytes/1048576).toFixed(1)} MB` : `${Math.round(bytes/1024)} KB`;
@@ -240,6 +255,58 @@ export default function CompanyDetail() {
                     <div className="text-muted text-sm mb-1">Account Notes</div>
                     {company.notes}
                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* Sales Rep */}
+            <div className="card mb-4">
+              <div className="card-header">
+                <h3>Sales Rep</h3>
+                {!editingRep && (
+                  <button className="btn btn-secondary btn-sm" onClick={openEditRep}>
+                    {company.sales_rep_name ? 'Edit' : '+ Assign'}
+                  </button>
+                )}
+              </div>
+              <div className="card-body">
+                {editingRep ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Name</label>
+                      <input className="form-control" value={repForm.sales_rep_name} onChange={e => setRepForm(p => ({ ...p, sales_rep_name: e.target.value }))} placeholder="Rep full name" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Email</label>
+                      <input className="form-control" type="email" value={repForm.sales_rep_email} onChange={e => setRepForm(p => ({ ...p, sales_rep_email: e.target.value }))} placeholder="rep@yourcompany.com" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Phone</label>
+                      <input className="form-control" value={repForm.sales_rep_phone} onChange={e => setRepForm(p => ({ ...p, sales_rep_phone: e.target.value }))} placeholder="(720) 555-0000" />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                      <button className="btn btn-primary btn-sm" onClick={saveRep}>Save</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setEditingRep(false)}>Cancel</button>
+                      {company.sales_rep_name && (
+                        <button className="btn btn-ghost btn-sm" style={{ color: '#dc2626' }}
+                          onClick={async () => { await axios.put(`/api/companies/${id}`, { ...company, sales_rep_name: '', sales_rep_email: '', sales_rep_phone: '' }); setEditingRep(false); load(); }}>
+                          Remove Rep
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : company.sales_rep_name ? (
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', fontSize: 13 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>👤</div>
+                    <div>
+                      <div className="font-bold">{company.sales_rep_name}</div>
+                      {company.sales_rep_email && <div className="text-muted">{company.sales_rep_email}</div>}
+                      {company.sales_rep_phone && <div className="text-muted">{company.sales_rep_phone}</div>}
+                      <div style={{ marginTop: 4, fontSize: 11, color: '#2563eb' }}>🔔 Gets notified on signatures & new jobs</div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted text-sm">No sales rep assigned. Assign one to enable notifications when proposals are signed or jobs are scheduled.</p>
                 )}
               </div>
             </div>

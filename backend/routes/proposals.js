@@ -253,6 +253,16 @@ router.get('/:id/pdf', (req, res) => {
 
   // --- Header ---
   doc.rect(0, 0, doc.page.width, 100).fill(blue);
+
+  // Embed company logo if available
+  if (settings.company_logo && settings.company_logo.startsWith('data:image/')) {
+    try {
+      const base64Data = settings.company_logo.replace(/^data:image\/\w+;base64,/, '');
+      const imgBuffer = Buffer.from(base64Data, 'base64');
+      doc.image(imgBuffer, doc.page.width - 110, 12, { fit: [80, 76], align: 'right' });
+    } catch (_) {}
+  }
+
   doc.fill('white').fontSize(22).font('Helvetica-Bold')
     .text('SERVICE PROPOSAL', 50, 30);
   doc.fontSize(10).font('Helvetica')
@@ -261,11 +271,13 @@ router.get('/:id/pdf', (req, res) => {
   doc.fill(darkText);
 
   // Proposal # and date
+  const dateX = settings.company_logo ? 370 : 400;
+  const dateW = settings.company_logo ? 115 : 145;
   doc.fontSize(10).font('Helvetica-Bold')
-    .text(proposal.proposal_number, 400, 32, { align: 'right', width: 145 });
+    .text(proposal.proposal_number, dateX, 32, { align: 'right', width: dateW });
   doc.font('Helvetica').fill(gray)
-    .text(`Date: ${new Date(proposal.created_at).toLocaleDateString()}`, 400, 48, { align: 'right', width: 145 })
-    .text(`Valid for: ${proposal.valid_days} days`, 400, 62, { align: 'right', width: 145 });
+    .text(`Date: ${new Date(proposal.created_at).toLocaleDateString()}`, dateX, 48, { align: 'right', width: dateW })
+    .text(`Valid for: ${proposal.valid_days} days`, dateX, 62, { align: 'right', width: dateW });
 
   doc.fill(darkText);
   let y = 120;
@@ -423,7 +435,7 @@ router.post('/sign/:token', (req, res) => {
   const { signed_by } = req.body;
   if (!signed_by || !signed_by.trim()) return res.status(400).json({ error: 'Full name is required to sign' });
 
-  const proposal = db.prepare('SELECT id, status, signed_at FROM proposals WHERE signature_token = ?').get(req.params.token);
+  const proposal = db.prepare('SELECT id, status, signed_at, title, company_id FROM proposals WHERE signature_token = ?').get(req.params.token);
   if (!proposal) return res.status(404).json({ error: 'Invalid or expired signing link' });
   if (proposal.signed_at) return res.status(409).json({ error: 'This proposal has already been signed' });
 
@@ -432,6 +444,23 @@ router.post('/sign/:token', (req, res) => {
       status = 'accepted', updated_at = CURRENT_TIMESTAMP
     WHERE signature_token = ?
   `).run(signed_by.trim(), req.params.token);
+
+  // Create notification
+  try {
+    const { createNotification } = require('../database');
+    const company = proposal.company_id
+      ? db.prepare('SELECT name, sales_rep_name FROM companies WHERE id = ?').get(proposal.company_id)
+      : null;
+    createNotification({
+      type: 'proposal_signed',
+      title: `✅ Proposal Signed: ${proposal.title}`,
+      message: `Signed by ${signed_by.trim()}${company ? ` — ${company.name}` : ''}`,
+      entity_type: 'proposal',
+      entity_id: proposal.id,
+      company_id: proposal.company_id,
+      sales_rep_name: company?.sales_rep_name,
+    });
+  } catch (_) {}
 
   res.json({ success: true, message: 'Proposal signed successfully' });
 });

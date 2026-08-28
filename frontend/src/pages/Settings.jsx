@@ -10,6 +10,7 @@ const DEFAULTS = {
   company_state: '',
   company_zip: '',
   company_license: '',
+  company_logo: '',
   proposal_terms: 'Payment due net 30 days. Price valid for 30 days from proposal date. All work performed per manufacturer specifications and local code.',
   proposal_footer: 'Thank you for the opportunity to earn your business.',
   tax_rate_default: '0',
@@ -29,6 +30,16 @@ export default function Settings() {
   }, []);
 
   const f = (k) => e => setForm(p => ({ ...p, [k]: e.target.value }));
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+    if (file.size > 2 * 1024 * 1024) { alert('Logo must be under 2 MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => setForm(p => ({ ...p, company_logo: ev.target.result }));
+    reader.readAsDataURL(file);
+  };
 
   const save = async () => {
     await axios.put('/api/settings', form);
@@ -110,16 +121,56 @@ export default function Settings() {
               </div>
             </div>
 
+            {/* Logo Upload */}
+            <div className="card mb-4">
+              <div className="card-header"><h3>Company Logo</h3></div>
+              <div className="card-body">
+                <p className="text-muted text-sm mb-4">Appears in the top-right corner of all proposal PDFs. PNG or JPG, under 2 MB recommended.</p>
+                {form.company_logo ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
+                    <img src={form.company_logo} alt="Company logo" style={{ maxHeight: 80, maxWidth: 200, borderRadius: 6, border: '1px solid #e5e7eb', background: '#f9fafb', padding: 4, objectFit: 'contain' }} />
+                    <div>
+                      <div style={{ fontSize: 13, color: '#374151', fontWeight: 600, marginBottom: 6 }}>Logo uploaded ✓</div>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setForm(p => ({ ...p, company_logo: '' }))}
+                        style={{ fontSize: 12 }}
+                      >
+                        Remove Logo
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ border: '2px dashed #d1d5db', borderRadius: 8, padding: '24px 16px', textAlign: 'center', marginBottom: 12, background: '#f9fafb' }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>🏢</div>
+                    <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>No logo uploaded yet</div>
+                  </div>
+                )}
+                <label style={{ display: 'inline-block', cursor: 'pointer' }}>
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                  <span className="btn btn-secondary" style={{ fontSize: 13 }}>
+                    {form.company_logo ? '🔄 Replace Logo' : '⬆ Upload Logo'}
+                  </span>
+                </label>
+                <p className="text-muted text-sm mt-2">Click "Save Settings" after uploading to apply.</p>
+              </div>
+            </div>
+
             {/* PDF Preview */}
             <div className="card">
               <div className="card-header"><h3>PDF Header Preview</h3></div>
               <div className="card-body">
-                <div style={{ background: '#1E40AF', color: 'white', borderRadius: 6, padding: '16px 20px' }}>
-                  <div style={{ fontSize: 18, fontWeight: 700 }}>SERVICE PROPOSAL</div>
-                  <div style={{ fontSize: 11, opacity: .8, marginTop: 4 }}>Commercial HVAC & Plumbing Services</div>
-                  <div style={{ fontSize: 11, opacity: .7, marginTop: 2 }}>
-                    {form.company_name || 'Your Company Name'} | {form.company_phone || '(555) 000-0000'} | {form.company_email || 'info@yourcompany.com'}
+                <div style={{ background: '#1E40AF', color: 'white', borderRadius: 6, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 700 }}>SERVICE PROPOSAL</div>
+                    <div style={{ fontSize: 11, opacity: .8, marginTop: 4 }}>Commercial HVAC & Plumbing Services</div>
+                    <div style={{ fontSize: 11, opacity: .7, marginTop: 2 }}>
+                      {form.company_name || 'Your Company Name'} | {form.company_phone || '(555) 000-0000'} | {form.company_email || 'info@yourcompany.com'}
+                    </div>
                   </div>
+                  {form.company_logo && (
+                    <img src={form.company_logo} alt="Logo" style={{ maxHeight: 56, maxWidth: 100, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.15)', padding: 4 }} />
+                  )}
                 </div>
                 <p className="text-muted text-sm mt-2">This is how your company info appears at the top of every proposal PDF.</p>
               </div>

@@ -11,6 +11,7 @@ const DEFAULTS = {
   company_state: '',
   company_zip: '',
   company_license: '',
+  company_logo: '',
   proposal_terms: 'Payment due net 30 days. Price valid for 30 days from proposal date. All work performed per manufacturer specifications and local code.',
   proposal_footer: 'Thank you for the opportunity to earn your business.',
   tax_rate_default: '0',

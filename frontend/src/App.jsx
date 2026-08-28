@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Logo from './components/Logo';
+import axios from 'axios';
 import Login from './pages/Login';
 import Portal from './pages/Portal';
 import Sign from './pages/Sign';
@@ -26,9 +27,94 @@ const NAV = [
   { to: '/analytics', label: 'Analytics', icon: '📈' },
 ];
 
+function NotificationsPanel({ onClose }) {
+  const [data, setData] = useState({ notifications: [], unread: 0 });
+
+  const load = () => axios.get('/api/notifications').then(r => setData(r.data)).catch(() => {});
+
+  useEffect(() => { load(); }, []);
+
+  const markAllRead = async () => {
+    await axios.put('/api/notifications/read-all');
+    load();
+  };
+
+  const markRead = async (id) => {
+    await axios.put(`/api/notifications/${id}/read`);
+    load();
+  };
+
+  const dismiss = async (id, e) => {
+    e.stopPropagation();
+    await axios.delete(`/api/notifications/${id}`);
+    load();
+  };
+
+  const typeIcon = (type) => type === 'proposal_signed' ? '✅' : type === 'job_scheduled' ? '📅' : '🔔';
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 4,
+      background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+      border: '1px solid #e5e7eb', zIndex: 1000, maxHeight: 380, display: 'flex', flexDirection: 'column', overflow: 'hidden'
+    }}>
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color: '#111' }}>Notifications</span>
+        {data.unread > 0 && (
+          <button onClick={markAllRead} style={{ fontSize: 11, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+            Mark all read
+          </button>
+        )}
+      </div>
+      <div style={{ overflowY: 'auto', flex: 1 }}>
+        {data.notifications.length === 0 ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>No notifications yet</div>
+        ) : data.notifications.map(n => (
+          <div key={n.id}
+            onClick={() => markRead(n.id)}
+            style={{
+              padding: '10px 14px', borderBottom: '1px solid #f5f5f5', cursor: 'pointer',
+              background: n.read_at ? 'transparent' : '#eff6ff',
+              display: 'flex', gap: 8, alignItems: 'flex-start'
+            }}
+          >
+            <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{typeIcon(n.type)}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: n.read_at ? 500 : 700, color: '#111', lineHeight: 1.4 }}>{n.title}</div>
+              {n.message && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{n.message}</div>}
+              {n.sales_rep_name && <div style={{ fontSize: 11, color: '#2563eb', marginTop: 2 }}>Rep: {n.sales_rep_name}</div>}
+              <div style={{ fontSize: 10, color: '#aaa', marginTop: 3 }}>{new Date(n.created_at).toLocaleString()}</div>
+            </div>
+            <button onClick={(e) => dismiss(n.id, e)} style={{ background: 'none', border: 'none', color: '#bbb', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>✕</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AppLayout() {
   const { token, username, logout, isDemo } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const notifsRef = useRef(null);
+
+  useEffect(() => {
+    if (!token) return;
+    const poll = () => axios.get('/api/notifications').then(r => setUnreadCount(r.data.unread)).catch(() => {});
+    poll();
+    const interval = setInterval(poll, 30000);
+    return () => clearInterval(interval);
+  }, [token]);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (notifsRef.current && !notifsRef.current.contains(e.target)) setShowNotifs(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   if (!token) return <Login />;
 
@@ -98,23 +184,41 @@ function AppLayout() {
             Settings
           </NavLink>
         </div>
-        <div style={{ padding: '8px 12px 4px', borderTop: '1px solid rgba(255,255,255,.08)' }}>
+        <div style={{ padding: '8px 12px 4px', borderTop: '1px solid rgba(255,255,255,.08)', position: 'relative' }} ref={notifsRef}>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 6, paddingLeft: 4 }}>
             Signed in as <strong style={{ color: 'rgba(255,255,255,.7)' }}>{username}</strong>
           </div>
-          <button
-            onClick={() => { logout(); closeMenu(); }}
-            style={{
-              width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,.08)',
-              border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, color: 'rgba(255,255,255,.6)',
-              fontSize: 12, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8
-            }}
-          >
-            🚪 Sign Out
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => { setShowNotifs(o => !o); setUnreadCount(0); }}
+              style={{
+                flex: '0 0 auto', padding: '7px 10px', background: showNotifs ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.08)',
+                border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, color: 'rgba(255,255,255,.8)',
+                fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, position: 'relative'
+              }}
+            >
+              🔔
+              {unreadCount > 0 && (
+                <span style={{ background: '#ef4444', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 5px', lineHeight: 1.4 }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { logout(); closeMenu(); }}
+              style={{
+                flex: 1, padding: '7px 10px', background: 'rgba(255,255,255,.08)',
+                border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, color: 'rgba(255,255,255,.6)',
+                fontSize: 12, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8
+              }}
+            >
+              🚪 Sign Out
+            </button>
+          </div>
+          {showNotifs && <NotificationsPanel onClose={() => setShowNotifs(false)} />}
         </div>
         <div style={{ padding: '8px 16px 12px', fontSize: 11, color: 'rgba(255,255,255,.3)' }}>
-          v3.5 • Conduit
+          v4.0 • Conduit
         </div>
       </nav>
 
