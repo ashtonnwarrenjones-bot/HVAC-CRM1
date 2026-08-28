@@ -59,6 +59,9 @@ function AppLayout() {
       <nav className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-logo">
           <Logo size={36} variant="white" subtitle="Field Service CRM" />
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4, paddingLeft: 2, fontStyle: 'italic', lineHeight: 1.4 }}>
+            Linking you to your customers
+          </div>
         </div>
         <div className="sidebar-nav">
           {NAV.map(({ to, label, icon, exact }) => (

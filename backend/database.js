@@ -216,10 +216,17 @@ const SCHEMA = `
 `;
 
 // ── Sample data for demo account ───────────────────────────────────────────
-async function seedDemoData() {
-  // Only seed if no companies exist yet
+async function seedDemoData(force = false) {
+  // Only seed if no companies exist yet (or forced)
   const existing = _sqlDb.prepare('SELECT id FROM companies LIMIT 1').get();
-  if (existing) return;
+  if (existing && !force) return;
+  if (force) {
+    // Wipe existing demo data before re-seeding
+    ['tasks','activities','deals','jobs','proposal_line_items','proposals','contacts','companies'].forEach(t => {
+      try { _sqlDb.run(`DELETE FROM ${t}`); } catch (_) {}
+    });
+    try { _sqlDb.run(`DELETE FROM users WHERE role = 'demo'`); } catch (_) {}
+  }
 
   console.log('🌱 Seeding demo data...');
 
@@ -670,3 +677,4 @@ async function initDb() {
 
 module.exports = db;
 module.exports.initDb = initDb;
+module.exports.seedDemoData = seedDemoData;

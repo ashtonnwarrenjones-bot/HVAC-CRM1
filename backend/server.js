@@ -51,6 +51,18 @@ app.use('/api/portal', requirePortalAuth, portalRouter);
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
+// Seed demo data on demand (admin only, not available to demo role)
+app.post('/api/admin/seed', requireAuth, demoGuard, async (req, res) => {
+  try {
+    const { seedDemoData } = require('./database');
+    await seedDemoData(true); // force = true wipes and re-seeds
+    res.json({ ok: true, message: 'Sample data loaded successfully.' });
+  } catch (err) {
+    console.error('Seed error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Serve React build in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../frontend/dist')));

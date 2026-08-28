@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import Logo from '../components/Logo';
 
 export default function Login() {
   const { login } = useAuth();
@@ -48,61 +49,94 @@ export default function Login() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.card}>
-        <div style={styles.logo}>🔧</div>
-        <h1 style={styles.title}>HVAC CRM</h1>
-        <p style={styles.sub}>
-          {mode === 'setup' ? 'Create your admin account to get started' : 'Sign in to continue'}
-        </p>
 
-        {error && <div style={styles.error}>{error}</div>}
+      {/* Left brand panel */}
+      <div style={styles.brand}>
+        <div style={styles.brandInner}>
+          <Logo size={52} variant="white" subtitle={null} />
+          <h1 style={styles.brandName}>Conduit</h1>
+          <p style={styles.tagline}>
+            Linking you to your customers,<br />and your customers back to you.
+          </p>
+          <div style={styles.featureList}>
+            {['Proposals & e-signatures', 'Job scheduling & dispatch', 'Pipeline management', 'Customer portal'].map(f => (
+              <div key={f} style={styles.featureItem}>
+                <span style={styles.featureDot} />
+                {f}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>
-            <label style={styles.label}>Username</label>
-            <input
-              style={styles.input}
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              placeholder="Enter username"
-              autoFocus
-              required
-            />
-          </div>
-          <div>
-            <label style={styles.label}>Password</label>
-            <input
-              type="password"
-              style={styles.input}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Enter password"
-              required
-            />
-          </div>
-          {mode === 'setup' && (
+      {/* Right login panel */}
+      <div style={styles.formPanel}>
+        <div style={styles.card}>
+          <h2 style={styles.title}>
+            {mode === 'setup' ? 'Create your account' : 'Welcome back'}
+          </h2>
+          <p style={styles.sub}>
+            {mode === 'setup'
+              ? 'Set up your admin account to get started'
+              : 'Sign in to your Conduit account'}
+          </p>
+
+          {error && <div style={styles.error}>{error}</div>}
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
-              <label style={styles.label}>Confirm Password</label>
+              <label style={styles.label}>Username</label>
               <input
-                type="password"
                 style={styles.input}
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Confirm password"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="Enter username"
+                autoFocus
                 required
               />
             </div>
-          )}
-          <button type="submit" style={styles.btn} disabled={submitting}>
-            {submitting ? 'Please wait…' : mode === 'setup' ? 'Create Account & Sign In' : 'Sign In'}
-          </button>
-        </form>
+            <div>
+              <label style={styles.label}>Password</label>
+              <input
+                type="password"
+                style={styles.input}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Enter password"
+                required
+              />
+            </div>
+            {mode === 'setup' && (
+              <div>
+                <label style={styles.label}>Confirm Password</label>
+                <input
+                  type="password"
+                  style={styles.input}
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm password"
+                  required
+                />
+              </div>
+            )}
+            <button type="submit" style={styles.btn} disabled={submitting}>
+              {submitting ? 'Please wait…' : mode === 'setup' ? 'Create Account & Sign In' : 'Sign In'}
+            </button>
+          </form>
 
-        {mode === 'setup' && (
-          <p style={{ marginTop: 16, fontSize: 12, color: '#999', textAlign: 'center' }}>
-            This is a one-time setup. Your credentials will be stored securely.
-          </p>
-        )}
+          {mode === 'setup' && (
+            <p style={{ marginTop: 16, fontSize: 12, color: '#999', textAlign: 'center' }}>
+              This is a one-time setup. Your credentials will be stored securely.
+            </p>
+          )}
+
+          <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
+            <p style={{ fontSize: 11, color: '#bbb', marginBottom: 4 }}>Demo access</p>
+            <p style={{ fontSize: 12, color: '#999' }}>
+              Username: <strong style={{ color: '#555' }}>demo</strong> · Password: <strong style={{ color: '#555' }}>demo123</strong>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -111,11 +145,61 @@ export default function Login() {
 const styles = {
   page: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #1a1f2e 0%, #0f1520 100%)',
+    display: 'flex',
+    flexDirection: 'row',
+    background: '#f8fafc',
+  },
+  brand: {
+    flex: '0 0 420px',
+    background: 'linear-gradient(160deg, #1e3a5f 0%, #1d4ed8 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: '48px 40px',
+    '@media (max-width: 700px)': { display: 'none' },
+  },
+  brandInner: {
+    maxWidth: 320,
+  },
+  brandName: {
+    fontSize: 36,
+    fontWeight: 800,
+    color: '#fff',
+    margin: '16px 0 6px',
+    letterSpacing: '-0.5px',
+  },
+  tagline: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.75)',
+    lineHeight: 1.6,
+    margin: '0 0 32px',
+    fontStyle: 'italic',
+  },
+  featureList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  featureItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  featureDot: {
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    background: '#60a5fa',
+    flexShrink: 0,
+  },
+  formPanel: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '40px 20px',
   },
   card: {
     background: '#fff',
@@ -123,24 +207,18 @@ const styles = {
     padding: '40px 36px',
     width: '100%',
     maxWidth: 400,
-    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-  },
-  logo: {
-    fontSize: 48,
-    textAlign: 'center',
-    marginBottom: 8,
+    boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+    border: '1px solid #e8ecf0',
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 700,
-    textAlign: 'center',
-    margin: '0 0 4px',
     color: '#1a1f2e',
+    margin: '0 0 6px',
   },
   sub: {
     fontSize: 13,
     color: '#888',
-    textAlign: 'center',
     marginBottom: 24,
   },
   label: {
@@ -171,6 +249,7 @@ const styles = {
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'opacity .2s',
+    width: '100%',
   },
   error: {
     background: '#fef2f2',

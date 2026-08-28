@@ -19,6 +19,8 @@ export default function Settings() {
   const [form, setForm] = useState(DEFAULTS);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+  const [seedMsg, setSeedMsg] = useState(null);
 
   useEffect(() => {
     axios.get('/api/settings').then(r => {
@@ -32,6 +34,21 @@ export default function Settings() {
     await axios.put('/api/settings', form);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  };
+
+  const loadSampleData = async () => {
+    if (!window.confirm('This will replace all existing companies, contacts, proposals, jobs, deals, and activities with sample data. Continue?')) return;
+    setSeeding(true);
+    setSeedMsg(null);
+    try {
+      const r = await axios.post('/api/admin/seed');
+      setSeedMsg({ ok: true, text: r.data.message });
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      setSeedMsg({ ok: false, text: err.response?.data?.error || 'Seed failed.' });
+    } finally {
+      setSeeding(false);
+    }
   };
 
   if (loading) return <div className="page-content"><p className="text-muted">Loading...</p></div>;
@@ -133,6 +150,28 @@ export default function Settings() {
                     placeholder="Thank you for the opportunity to earn your business." />
                   <p className="text-muted text-sm mt-1">Printed at the bottom of every proposal.</p>
                 </div>
+              </div>
+            </div>
+
+            <div className="card mb-4">
+              <div className="card-header"><h3>Sample Data</h3></div>
+              <div className="card-body">
+                <p style={{ fontSize: 13, color: 'var(--gray-600)', marginBottom: 12, lineHeight: 1.6 }}>
+                  Load a full set of demo companies, contacts, proposals, jobs, and pipeline deals so you can explore every feature. <strong>This replaces any existing data.</strong>
+                </p>
+                {seedMsg && (
+                  <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, fontSize: 13, fontWeight: 500, background: seedMsg.ok ? 'var(--green-50)' : '#fef2f2', color: seedMsg.ok ? 'var(--green-700)' : '#b91c1c' }}>
+                    {seedMsg.ok ? '✓ ' : '✗ '}{seedMsg.text}
+                  </div>
+                )}
+                <button
+                  className="btn btn-secondary"
+                  onClick={loadSampleData}
+                  disabled={seeding}
+                  style={{ width: '100%' }}
+                >
+                  {seeding ? '⏳ Loading...' : '🌱 Load Sample Data'}
+                </button>
               </div>
             </div>
 
