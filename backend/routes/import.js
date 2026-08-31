@@ -200,9 +200,26 @@ router.post(
             if (dupe) { summary.contacts_skipped++; continue; }
           }
 
-          const company_id = m.company_name
-            ? (companyMap[m.company_name.toLowerCase()] ?? null)
-            : null;
+          // Resolve company — auto-create if it doesn't exist yet
+          let company_id = null;
+          if (m.company_name) {
+            const key = m.company_name.toLowerCase();
+            if (companyMap[key]) {
+              company_id = companyMap[key];
+            } else {
+              // Create a stub company so the contact is linked
+              try {
+                const r = db.prepare(
+                  'INSERT INTO companies (name) VALUES (?)'
+                ).run(m.company_name);
+                company_id = r.lastInsertRowid;
+                companyMap[key] = company_id;
+                summary.companies_created++;
+              } catch (err) {
+                summary.errors.push(`Auto-create company "${m.company_name}": ${err.message}`);
+              }
+            }
+          }
 
           try {
             db.prepare(`
