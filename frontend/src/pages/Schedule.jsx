@@ -37,6 +37,7 @@ export default function Schedule() {
   const [jobs, setJobs] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [users, setUsers] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editJob, setEditJob] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -60,6 +61,7 @@ export default function Schedule() {
   useEffect(() => {
     axios.get('/api/companies').then(r => setCompanies(r.data)).catch(() => {});
     axios.get('/api/contacts').then(r => setContacts(r.data)).catch(() => {});
+    axios.get('/api/users').then(r => setUsers(r.data)).catch(() => {});
   }, []);
 
   function prevMonth() { setCurrentDate(new Date(year, month - 1, 1)); }
@@ -352,6 +354,7 @@ export default function Schedule() {
           defaultDate={selectedDate}
           companies={companies}
           contacts={contacts}
+          users={users}
           onSave={async (data) => {
             if (editJob) await axios.put(`/api/jobs/${editJob.id}`, data);
             else await axios.post('/api/jobs', data);
@@ -365,7 +368,7 @@ export default function Schedule() {
   );
 }
 
-function JobModal({ job, defaultDate, companies, contacts, onSave, onClose }) {
+function JobModal({ job, defaultDate, companies, contacts, users, onSave, onClose }) {
   const [form, setForm] = useState({
     title: job?.title || '',
     job_type: job?.job_type || 'maintenance',
@@ -388,6 +391,9 @@ function JobModal({ job, defaultDate, companies, contacts, onSave, onClose }) {
     setSaving(true);
     try { await onSave(form); } finally { setSaving(false); }
   }
+
+  // Technician users only (exclude demo role)
+  const techUsers = users.filter(u => u.role !== 'demo');
 
   return (
     <div className="sched-overlay" onClick={onClose}>
@@ -432,7 +438,12 @@ function JobModal({ job, defaultDate, companies, contacts, onSave, onClose }) {
             </div>
             <div>
               <label style={lbl}>Technician</label>
-              <input style={inp} value={form.technician} onChange={e => set('technician', e.target.value)} placeholder="Technician name" />
+              <select style={inp} value={form.technician} onChange={e => set('technician', e.target.value)}>
+                <option value="">— Unassigned —</option>
+                {techUsers.map(u => (
+                  <option key={u.id} value={u.username}>{u.username} ({u.role})</option>
+                ))}
+              </select>
             </div>
             <div>
               <label style={lbl}>Duration (hours)</label>
