@@ -19,6 +19,30 @@ const ACTIVITY_META = {
   meeting_summary:  { icon: '📋', label: 'Meeting Summary',  color: '#dc2626' },
 };
 
+// <img> tags can't send auth headers — fetch the file with Bearer token and
+// render it as a blob URL instead. Revokes the URL when the component unmounts.
+function AuthImage({ src, style, onClick, title, alt }) {
+  const [blobSrc, setBlobSrc] = React.useState(null);
+  React.useEffect(() => {
+    if (!src) return;
+    let revoke;
+    const token = localStorage.getItem('crm_token');
+    fetch(src, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then(r => r.ok ? r.blob() : Promise.reject(r.status))
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        revoke = url;
+        setBlobSrc(url);
+      })
+      .catch(() => {});
+    return () => { if (revoke) URL.revokeObjectURL(revoke); };
+  }, [src]);
+  if (!blobSrc) return (
+    <div style={{ ...style, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🖼️</div>
+  );
+  return <img src={blobSrc} alt={alt || ''} style={style} onClick={onClick} title={title} />;
+}
+
 const CONTRACT_COLORS = {
   maintenance_contract: 'badge-green', on_call: 'badge-blue',
   prospect: 'badge-yellow', inactive: 'badge-gray',
@@ -650,7 +674,7 @@ export default function CompanyDetail() {
                                   <span style={{ fontSize: 10 }}>Video</span>
                                 </a>
                               ) : (
-                                <img
+                                <AuthImage
                                   src={fileUrl}
                                   alt={photo.original_name}
                                   onClick={() => setLightbox({ url: fileUrl, name: photo.original_name })}
@@ -948,7 +972,7 @@ export default function CompanyDetail() {
                           <span style={{ fontSize: 10, fontWeight: 600 }}>Video</span>
                         </a>
                       ) : (
-                        <img key={photo.id} src={fileUrl} alt={photo.original_name}
+                        <AuthImage key={photo.id} src={fileUrl} alt={photo.original_name}
                           onClick={() => setLightbox({ url: fileUrl, name: photo.original_name })}
                           style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: '1.5px solid #e5e7eb' }}
                         />
@@ -972,7 +996,7 @@ export default function CompanyDetail() {
             zIndex: 9999, cursor: 'zoom-out', padding: 20,
           }}
         >
-          <img
+          <AuthImage
             src={lightbox.url}
             alt={lightbox.name}
             onClick={e => e.stopPropagation()}
