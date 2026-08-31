@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import SalesforceImport from '../components/SalesforceImport';
 
 const DEFAULTS = {
   company_name: '',
@@ -19,14 +20,26 @@ const DEFAULTS = {
 export default function Settings() {
   const [form, setForm] = useState(DEFAULTS);
   const [saved, setSaved] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [seedMsg, setSeedMsg] = useState(null);
 
+  // User management
+  const [users, setUsers] = useState([]);
+  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'technician' });
+  const [userMsg, setUserMsg] = useState(null);
+  const [creatingUser, setCreatingUser] = useState(false);
+
   useEffect(() => {
     axios.get('/api/settings').then(r => {
       setForm(f => ({ ...f, ...r.data }));
+    }).catch(err => {
+      console.error('Failed to load settings:', err);
     }).finally(() => setLoading(false));
+
+    axios.get('/api/users').then(r => setUsers(r.data)).catch(() => {});
   }, []);
 
   const f = (k) => e => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -42,9 +55,19 @@ export default function Settings() {
   };
 
   const save = async () => {
-    await axios.put('/api/settings', form);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setSaving(true);
+    setSaveErr('');
+    try {
+      await axios.put('/api/settings', form);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Save failed';
+      setSaveErr(msg);
+      setTimeout(() => setSaveErr(''), 5000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const loadSampleData = async () => {
@@ -62,15 +85,49 @@ export default function Settings() {
     }
   };
 
+  const createUser = async () => {
+    if (!newUser.username || !newUser.password) {
+      setUserMsg({ ok: false, text: 'Username and password are required.' });
+      return;
+    }
+    setCreatingUser(true);
+    setUserMsg(null);
+    try {
+      const { data } = await axios.post('/api/users', newUser);
+      setUsers(u => [...u, data]);
+      setNewUser({ username: '', password: '', role: 'technician' });
+      setUserMsg({ ok: true, text: `User "${data.username}" created.` });
+    } catch (err) {
+      setUserMsg({ ok: false, text: err.response?.data?.error || 'Failed to create user.' });
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const deleteUser = async (id, username) => {
+    if (!window.confirm(`Delete user "${username}"?`)) return;
+    try {
+      await axios.delete(`/api/users/${id}`);
+      setUsers(u => u.filter(x => x.id !== id));
+    } catch {
+      alert('Failed to delete user.');
+    }
+  };
+
   if (loading) return <div className="page-content"><p className="text-muted">Loading...</p></div>;
 
   return (
     <>
       <div className="page-header">
         <h2>Settings</h2>
-        <button className="btn btn-primary" onClick={save}>
-          {saved ? '✓ Saved!' : 'Save Settings'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {saveErr && (
+            <span style={{ fontSize: 12, color: '#b91c1c', fontWeight: 500 }}>✗ {saveErr}</span>
+          )}
+          <button className="btn btn-primary" onClick={save} disabled={saving}>
+            {saving ? '⏳ Saving…' : saved ? '✓ Saved!' : 'Save Settings'}
+          </button>
+        </div>
       </div>
 
       <div className="page-content">
@@ -157,7 +214,7 @@ export default function Settings() {
             </div>
 
             {/* PDF Preview */}
-            <div className="card">
+            <div className="card mb-4">
               <div className="card-header"><h3>PDF Header Preview</h3></div>
               <div className="card-body">
                 <div style={{ background: '#1E40AF', color: 'white', borderRadius: 6, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -175,9 +232,79 @@ export default function Settings() {
                 <p className="text-muted text-sm mt-2">This is how your company info appears at the top of every proposal PDF.</p>
               </div>
             </div>
+
+            {/* User Management */}
+            <div className="card">
+              <div className="card-header"><h3>User Management</h3></div>
+              <div className="card-body">
+                {users.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    {users.map(u => (
+                      <div key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>{u.username}</span>
+                          <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', borderRadius: 12, background: u.role === 'admin' ? '#dbeafe' : '#f3f4f6', color: u.role === 'admin' ? '#1d4ed8' : '#374151' }}>
+                            {u.role}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => deleteUser(u.id, u.username)}
+                          style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontSize: 12, padding: '2px 6px' }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: 'var(--gray-700)' }}>Add User</div>
+                <div className="form-group">
+                  <input
+                    className="form-control"
+                    placeholder="Username"
+                    value={newUser.username}
+                    onChange={e => setNewUser(u => ({ ...u, username: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <input
+                    className="form-control"
+                    type="password"
+                    placeholder="Password"
+                    value={newUser.password}
+                    onChange={e => setNewUser(u => ({ ...u, password: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <select
+                    className="form-control"
+                    value={newUser.role}
+                    onChange={e => setNewUser(u => ({ ...u, role: e.target.value }))}
+                  >
+                    <option value="technician">Technician</option>
+                    <option value="admin">Admin</option>
+                    <option value="demo">Demo (read-only)</option>
+                  </select>
+                </div>
+                {userMsg && (
+                  <div style={{ marginBottom: 10, padding: '7px 12px', borderRadius: 6, fontSize: 13, background: userMsg.ok ? 'var(--green-50)' : '#fef2f2', color: userMsg.ok ? 'var(--green-700)' : '#b91c1c' }}>
+                    {userMsg.ok ? '✓ ' : '✗ '}{userMsg.text}
+                  </div>
+                )}
+                <button
+                  className="btn btn-primary"
+                  onClick={createUser}
+                  disabled={creatingUser}
+                  style={{ width: '100%' }}
+                >
+                  {creatingUser ? '⏳ Creating…' : '+ Create User'}
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Proposal Defaults */}
+          {/* Right column */}
           <div>
             <div className="card mb-4">
               <div className="card-header"><h3>Proposal Defaults</h3></div>
@@ -201,6 +328,30 @@ export default function Settings() {
                     placeholder="Thank you for the opportunity to earn your business." />
                   <p className="text-muted text-sm mt-1">Printed at the bottom of every proposal.</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Salesforce Import */}
+            <SalesforceImport />
+
+            {/* Data Backup */}
+            <div className="card mb-4">
+              <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>💾</span>
+                <h3 style={{ margin: 0 }}>Backup Your Data</h3>
+              </div>
+              <div className="card-body">
+                <p style={{ fontSize: 13, color: 'var(--gray-600)', marginBottom: 14, lineHeight: 1.6 }}>
+                  Download a full backup of all your companies, contacts, proposals, jobs, and pipeline deals as a JSON file.
+                </p>
+                <a
+                  href="/api/settings/backup"
+                  download
+                  className="btn btn-secondary"
+                  style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}
+                >
+                  ⬇ Download Backup
+                </a>
               </div>
             </div>
 
@@ -231,20 +382,17 @@ export default function Settings() {
               <div className="card-body">
                 <div style={{ fontSize: 13, lineHeight: 1.7 }}>
                   <div className="flex justify-between" style={{ padding: '4px 0', borderBottom: '1px solid var(--gray-100)' }}>
-                    <span className="text-muted">Version</span><span>2.0</span>
+                    <span className="text-muted">Version</span><span>3.0</span>
                   </div>
                   <div className="flex justify-between" style={{ padding: '4px 0', borderBottom: '1px solid var(--gray-100)' }}>
-                    <span className="text-muted">Backend</span><span>Node.js + Express + SQLite</span>
+                    <span className="text-muted">Backend</span><span>Node.js + Express + PostgreSQL</span>
                   </div>
                   <div className="flex justify-between" style={{ padding: '4px 0', borderBottom: '1px solid var(--gray-100)' }}>
                     <span className="text-muted">Frontend</span><span>React 18 + Vite</span>
                   </div>
                   <div className="flex justify-between" style={{ padding: '4px 0' }}>
-                    <span className="text-muted">Database</span><span>crm.db (SQLite)</span>
+                    <span className="text-muted">Database</span><span>PostgreSQL (Render)</span>
                   </div>
-                </div>
-                <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--blue-50)', borderRadius: 6, fontSize: 12, color: 'var(--blue-700)' }}>
-                  💾 Back up your data by copying <strong>backend/crm.db</strong>
                 </div>
               </div>
             </div>
