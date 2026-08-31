@@ -75,6 +75,10 @@ export default function CompanyDetail() {
   const [inviting, setInviting] = useState(null); // contact_id being invited
   const [inviteCopied, setInviteCopied] = useState(false);
 
+  // Service photos state
+  const [photoGroups, setPhotoGroups] = useState([]);
+  const [lightbox, setLightbox] = useState(null); // { url, name }
+
   // Sales rep state
   const [editingRep, setEditingRep] = useState(false);
   const [repForm, setRepForm] = useState({ sales_rep_name: '', sales_rep_email: '', sales_rep_phone: '' });
@@ -82,8 +86,9 @@ export default function CompanyDetail() {
   const load = useCallback(() => axios.get(`/api/companies/${id}`).then(r => setCompany(r.data)), [id]);
   const loadAttachments = useCallback(() => axios.get(`/api/attachments?company_id=${id}`).then(r => setAttachments(r.data)), [id]);
   const loadTasks = useCallback(() => axios.get(`/api/tasks?company_id=${id}`).then(r => setTasks(r.data)), [id]);
+  const loadPhotos = useCallback(() => axios.get(`/api/photos/companies/${id}`).then(r => setPhotoGroups(r.data)).catch(() => {}), [id]);
 
-  useEffect(() => { load(); loadAttachments(); loadTasks(); }, [load, loadAttachments, loadTasks]);
+  useEffect(() => { load(); loadAttachments(); loadTasks(); loadPhotos(); }, [load, loadAttachments, loadTasks, loadPhotos]);
 
   const saveContact = async () => {
     const data = { ...contactForm, company_id: id };
@@ -502,6 +507,86 @@ export default function CompanyDetail() {
               )}
             </div>
 
+            {/* ── Service Photos ── */}
+            <div className="card mb-4">
+              <div className="card-header">
+                <h3>📸 Service Photos ({photoGroups.reduce((sum, g) => sum + g.photos.length, 0)})</h3>
+              </div>
+              {photoGroups.length === 0 ? (
+                <div style={{ padding: '16px 18px', color: '#9ca3af', fontSize: 13 }}>
+                  No service photos yet. Techs can add photos from the mobile app during jobs.
+                </div>
+              ) : (
+                <div>
+                  {photoGroups.map(group => (
+                    <div key={group.job_id} style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 16px' }}>
+                      {/* Job header */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#1e3a5f' }}>
+                          🔧 {group.job_title}
+                        </span>
+                        {group.scheduled_date && (
+                          <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                            {new Date(group.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        )}
+                        {group.job_status && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '2px 7px',
+                            background: group.job_status === 'completed' ? '#d1fae5' : '#dbeafe',
+                            color: group.job_status === 'completed' ? '#065f46' : '#1d4ed8',
+                            textTransform: 'capitalize',
+                          }}>
+                            {group.job_status}
+                          </span>
+                        )}
+                      </div>
+                      {/* Photo grid */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {group.photos.map(photo => {
+                          const isVideo = photo.mimetype?.startsWith('video/');
+                          const fileUrl = `${API}/api/photos/${photo.id}/file`;
+                          return (
+                            <div key={photo.id} style={{ position: 'relative' }}>
+                              {isVideo ? (
+                                <a href={fileUrl} target="_blank" rel="noreferrer"
+                                  style={{
+                                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                    width: 90, height: 90, borderRadius: 8, background: '#1e3a5f',
+                                    color: '#fff', textDecoration: 'none', fontSize: 12, fontWeight: 600, gap: 4,
+                                  }}>
+                                  <span style={{ fontSize: 24 }}>▶</span>
+                                  <span style={{ fontSize: 10 }}>Video</span>
+                                </a>
+                              ) : (
+                                <img
+                                  src={fileUrl}
+                                  alt={photo.original_name}
+                                  onClick={() => setLightbox({ url: fileUrl, name: photo.original_name })}
+                                  style={{
+                                    width: 90, height: 90, objectFit: 'cover', borderRadius: 8,
+                                    cursor: 'pointer', border: '1.5px solid #e5e7eb',
+                                  }}
+                                  title={photo.original_name}
+                                />
+                              )}
+                              {photo.storage === 'sharepoint' && (
+                                <span style={{
+                                  position: 'absolute', bottom: 3, left: 3,
+                                  fontSize: 9, background: 'rgba(0,0,0,0.55)', color: '#fff',
+                                  borderRadius: 3, padding: '1px 4px',
+                                }}>☁ OneDrive</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* ── Activity / Notes Log ── */}
             <div className="card">
               <div className="card-header" style={{ flexWrap: 'wrap', gap: 8 }}>
@@ -690,6 +775,44 @@ export default function CompanyDetail() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Photo Lightbox ── */}
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, cursor: 'zoom-out', padding: 20,
+          }}
+        >
+          <img
+            src={lightbox.url}
+            alt={lightbox.name}
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 10, objectFit: 'contain', cursor: 'default' }}
+          />
+          <button
+            onClick={() => setLightbox(null)}
+            style={{
+              position: 'absolute', top: 16, right: 20,
+              background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+              fontSize: 22, width: 38, height: 38, borderRadius: '50%', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >✕</button>
+          <a
+            href={lightbox.url}
+            download
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+              background: 'rgba(255,255,255,0.15)', color: '#fff', padding: '8px 18px',
+              borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600,
+            }}
+          >⬇ Download</a>
         </div>
       )}
 
