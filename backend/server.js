@@ -41,6 +41,7 @@ app.use('/api/jobs', requireAuth, demoGuard, require('./routes/jobs'));
 app.use('/api/tasks', requireAuth, demoGuard, require('./routes/tasks'));
 app.use('/api/attachments', requireAuth, demoGuard, require('./routes/attachments'));
 app.use('/api/notifications', requireAuth, require('./routes/notifications'));
+app.use('/api/users', requireAuth, demoGuard, require('./routes/users'));
 
 // Portal admin routes (admin JWT required)
 app.use('/api/portal/admin', requireAuth, demoGuard, portalRouter);
