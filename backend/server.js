@@ -6,8 +6,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Auth routes (public)
 app.use('/api/auth', require('./routes/auth'));
@@ -41,6 +41,9 @@ app.use('/api/jobs', requireAuth, demoGuard, require('./routes/jobs'));
 app.use('/api/tasks', requireAuth, demoGuard, require('./routes/tasks'));
 app.use('/api/attachments', requireAuth, demoGuard, require('./routes/attachments'));
 app.use('/api/notifications', requireAuth, require('./routes/notifications'));
+app.use('/api/users', requireAuth, demoGuard, require('./routes/users'));
+app.use('/api/photos', requireAuth, demoGuard, require('./routes/photos'));
+app.use('/api/import', requireAuth, demoGuard, require('./routes/import'));
 
 // Portal admin routes (admin JWT required)
 app.use('/api/portal/admin', requireAuth, demoGuard, portalRouter);
@@ -51,6 +54,26 @@ app.use('/api/portal', requirePortalAuth, portalRouter);
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
+
+// Temporary setup — creates admin user if no users exist
+app.post('/api/setup', async (req, res) => {
+  try {
+    const { Pool } = require('pg');
+    const bcrypt = require('bcryptjs');
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+    const count = await pool.query('SELECT COUNT(*) FROM users');
+    if (parseInt(count.rows[0].count) > 0) {
+      await pool.end();
+      return res.json({ message: 'Users already exist', count: count.rows[0].count });
+    }
+    const hash = await bcrypt.hash('admin123', 10);
+    await pool.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)', ['admin', hash, 'admin']);
+    await pool.end();
+    res.json({ ok: true, message: 'Admin user created. Login: admin / admin123' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Seed demo data on demand (admin only, not available to demo role)
 app.post('/api/admin/seed', requireAuth, demoGuard, async (req, res) => {
