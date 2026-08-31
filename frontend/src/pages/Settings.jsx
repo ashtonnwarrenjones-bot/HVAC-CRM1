@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import SalesforceImport from '../components/SalesforceImport';
 
 const DEFAULTS = {
   company_name: '',
@@ -23,41 +24,10 @@ export default function Settings() {
   const [seeding, setSeeding] = useState(false);
   const [seedMsg, setSeedMsg] = useState(null);
 
-  // Team / user management
-  const [users, setUsers] = useState([]);
-  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'technician' });
-  const [userMsg, setUserMsg] = useState(null);
-  const [savingUser, setSavingUser] = useState(false);
-
-  const loadUsers = () => axios.get('/api/users').then(r => setUsers(r.data)).catch(() => {});
-
-  const createUser = async () => {
-    if (!newUser.username || !newUser.password) return;
-    setSavingUser(true);
-    setUserMsg(null);
-    try {
-      await axios.post('/api/users', newUser);
-      setNewUser({ username: '', password: '', role: 'technician' });
-      setUserMsg({ ok: true, text: 'User created.' });
-      loadUsers();
-    } catch (e) {
-      setUserMsg({ ok: false, text: e.response?.data?.error || 'Failed to create user.' });
-    } finally {
-      setSavingUser(false);
-    }
-  };
-
-  const deleteUser = async (id, uname) => {
-    if (!window.confirm(`Delete user "${uname}"?`)) return;
-    await axios.delete(`/api/users/${id}`);
-    loadUsers();
-  };
-
   useEffect(() => {
     axios.get('/api/settings').then(r => {
       setForm(f => ({ ...f, ...r.data }));
     }).finally(() => setLoading(false));
-    loadUsers();
   }, []);
 
   const f = (k) => e => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -208,7 +178,7 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Proposal Defaults */}
+          {/* Right column */}
           <div>
             <div className="card mb-4">
               <div className="card-header"><h3>Proposal Defaults</h3></div>
@@ -235,50 +205,8 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Team / User Management */}
-            <div className="card mb-4">
-              <div className="card-header"><h3>Team Accounts</h3></div>
-              <div className="card-body">
-                <p style={{ fontSize: 13, color: 'var(--gray-600)', marginBottom: 12, lineHeight: 1.6 }}>
-                  Create login accounts for your field technicians. They use these to sign in to the <strong>Conduit mobile app</strong>.
-                </p>
-
-                {/* Existing users */}
-                {users.length > 0 && (
-                  <div style={{ marginBottom: 16 }}>
-                    {users.map(u => (
-                      <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--gray-100)', fontSize: 13 }}>
-                        <div>
-                          <span style={{ fontWeight: 600 }}>{u.username}</span>
-                          <span style={{ marginLeft: 8, fontSize: 11, background: u.role === 'admin' ? 'var(--blue-50)' : '#f0fdf4', color: u.role === 'admin' ? 'var(--blue-700)' : '#15803d', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>{u.role}</span>
-                        </div>
-                        {u.role !== 'admin' && u.role !== 'demo' && (
-                          <button onClick={() => deleteUser(u.id, u.username)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 12 }}>Remove</button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Create user */}
-                {userMsg && (
-                  <div style={{ marginBottom: 10, padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, background: userMsg.ok ? '#f0fdf4' : '#fef2f2', color: userMsg.ok ? '#15803d' : '#b91c1c' }}>
-                    {userMsg.text}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <input className="form-control" style={{ flex: '1 1 120px' }} placeholder="Username" value={newUser.username} onChange={e => setNewUser(p => ({ ...p, username: e.target.value }))} />
-                  <input className="form-control" style={{ flex: '1 1 120px' }} placeholder="Password" type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} />
-                  <select className="form-control" style={{ flex: '0 0 130px' }} value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value }))}>
-                    <option value="technician">Technician</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                  <button className="btn btn-primary" onClick={createUser} disabled={savingUser || !newUser.username || !newUser.password}>
-                    {savingUser ? '...' : 'Add User'}
-                  </button>
-                </div>
-              </div>
-            </div>
+            {/* Salesforce Import */}
+            <SalesforceImport />
 
             <div className="card mb-4">
               <div className="card-header"><h3>Sample Data</h3></div>
