@@ -227,7 +227,7 @@ function AppLayout() {
           {showNotifs && <NotificationsPanel onClose={() => setShowNotifs(false)} />}
         </div>
         <div style={{ padding: '8px 16px 12px', fontSize: 11, color: 'rgba(255,255,255,.3)' }}>
-          v4.0 • Conduit
+          v4.4 • Conduit
         </div>
       </nav>
 
