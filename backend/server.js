@@ -55,62 +55,6 @@ app.use('/api/portal', requirePortalAuth, portalRouter);
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
-// Temporary setup — creates admin user if no users exist
-app.post('/api/setup', async (req, res) => {
-  try {
-    const { Pool } = require('pg');
-    const bcrypt = require('bcryptjs');
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-    const count = await pool.query('SELECT COUNT(*) FROM users');
-    if (parseInt(count.rows[0].count) > 0) {
-      await pool.end();
-      return res.json({ message: 'Users already exist', count: count.rows[0].count });
-    }
-    const hash = await bcrypt.hash('admin123', 10);
-    await pool.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)', ['admin', hash, 'admin']);
-    await pool.end();
-    res.json({ ok: true, message: 'Admin user created. Login: admin / admin123' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Temporary — promote first user to admin role
-app.post('/api/setup/makeadmin', async (req, res) => {
-  try {
-    const { Pool } = require('pg');
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-    const users = await pool.query('SELECT id, username FROM users LIMIT 1');
-    if (!users.rows.length) { await pool.end(); return res.json({ error: 'No users found' }); }
-    await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [users.rows[0].id]);
-    await pool.end();
-    res.json({ ok: true, message: `"${users.rows[0].username}" is now admin. Log out and back in.` });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Temporary reset — force-resets admin password to admin123
-app.post('/api/setup/reset', async (req, res) => {
-  try {
-    const { Pool } = require('pg');
-    const bcrypt = require('bcryptjs');
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-    const hash = await bcrypt.hash('admin123', 10);
-    // Show existing users
-    const users = await pool.query('SELECT id, username, role FROM users');
-    // Reset first user's password
-    if (users.rows.length > 0) {
-      await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, users.rows[0].id]);
-      await pool.end();
-      return res.json({ ok: true, message: `Reset password for "${users.rows[0].username}". Login with that username and password: admin123`, users: users.rows });
-    }
-    // No users — create admin
-    await pool.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)', ['admin', hash, 'admin']);
-    await pool.end();
-    res.json({ ok: true, message: 'Created admin user. Login: admin / admin123' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // Seed demo data on demand (admin only, not available to demo role)
 app.post('/api/admin/seed', requireAuth, demoGuard, async (req, res) => {
