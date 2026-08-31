@@ -75,6 +75,19 @@ app.post('/api/setup', async (req, res) => {
   }
 });
 
+// Temporary — promote first user to admin role
+app.post('/api/setup/makeadmin', async (req, res) => {
+  try {
+    const { Pool } = require('pg');
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+    const users = await pool.query('SELECT id, username FROM users LIMIT 1');
+    if (!users.rows.length) { await pool.end(); return res.json({ error: 'No users found' }); }
+    await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [users.rows[0].id]);
+    await pool.end();
+    res.json({ ok: true, message: `"${users.rows[0].username}" is now admin. Log out and back in.` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Temporary reset — force-resets admin password to admin123
 app.post('/api/setup/reset', async (req, res) => {
   try {
