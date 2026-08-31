@@ -79,6 +79,12 @@ export default function CompanyDetail() {
   const [photoGroups, setPhotoGroups] = useState([]);
   const [lightbox, setLightbox] = useState(null); // { url, name }
 
+  // Service history state
+  const [serviceJobs, setServiceJobs] = useState([]);
+  const [selectedJob, setSelectedJob] = useState(null); // job opened in slide-over
+  const [jobPhotos, setJobPhotos] = useState([]); // photos for selectedJob
+  const [loadingJobPhotos, setLoadingJobPhotos] = useState(false);
+
   // Sales rep state
   const [editingRep, setEditingRep] = useState(false);
   const [repForm, setRepForm] = useState({ sales_rep_name: '', sales_rep_email: '', sales_rep_phone: '' });
@@ -87,8 +93,23 @@ export default function CompanyDetail() {
   const loadAttachments = useCallback(() => axios.get(`/api/attachments?company_id=${id}`).then(r => setAttachments(r.data)), [id]);
   const loadTasks = useCallback(() => axios.get(`/api/tasks?company_id=${id}`).then(r => setTasks(r.data)), [id]);
   const loadPhotos = useCallback(() => axios.get(`/api/photos/companies/${id}`).then(r => setPhotoGroups(r.data)).catch(() => {}), [id]);
+  const loadServiceJobs = useCallback(() =>
+    axios.get(`/api/jobs?company_id=${id}`).then(r =>
+      setServiceJobs(r.data.sort((a, b) => (b.scheduled_date || '').localeCompare(a.scheduled_date || '')))
+    ).catch(() => {}), [id]);
 
-  useEffect(() => { load(); loadAttachments(); loadTasks(); loadPhotos(); }, [load, loadAttachments, loadTasks, loadPhotos]);
+  useEffect(() => { load(); loadAttachments(); loadTasks(); loadPhotos(); loadServiceJobs(); }, [load, loadAttachments, loadTasks, loadPhotos, loadServiceJobs]);
+
+  const openJobPanel = async (job) => {
+    setSelectedJob(job);
+    setJobPhotos([]);
+    setLoadingJobPhotos(true);
+    try {
+      const r = await axios.get(`/api/photos/jobs/${job.id}`);
+      setJobPhotos(r.data);
+    } catch { /* non-critical */ }
+    finally { setLoadingJobPhotos(false); }
+  };
 
   const saveContact = async () => {
     const data = { ...contactForm, company_id: id };
@@ -436,6 +457,76 @@ export default function CompanyDetail() {
               )}
             </div>
 
+            {/* ── Service History ── */}
+            <div className="card mb-4">
+              <div className="card-header">
+                <h3>🔧 Service History ({serviceJobs.length})</h3>
+              </div>
+              {serviceJobs.length === 0 ? (
+                <div style={{ padding: '16px 18px', color: '#9ca3af', fontSize: 13 }}>
+                  No service records yet. Jobs scheduled for this company will appear here.
+                </div>
+              ) : (
+                <div>
+                  {serviceJobs.map(job => {
+                    const statusColors = {
+                      completed:    { bg: '#d1fae5', color: '#065f46' },
+                      'in progress':{ bg: '#ede9fe', color: '#6d28d9' },
+                      scheduled:    { bg: '#dbeafe', color: '#1d4ed8' },
+                      'on site':    { bg: '#d1fae5', color: '#065f46' },
+                      'on the way': { bg: '#fef3c7', color: '#d97706' },
+                    };
+                    const sc = statusColors[job.status?.toLowerCase()] || { bg: '#f3f4f6', color: '#6b7280' };
+                    return (
+                      <div
+                        key={job.id}
+                        onClick={() => openJobPanel(job)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '11px 16px', borderBottom: '1px solid #f3f4f6',
+                          cursor: 'pointer', transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                      >
+                        {/* Date block */}
+                        <div style={{ textAlign: 'center', minWidth: 40 }}>
+                          {job.scheduled_date ? (
+                            <>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>
+                                {new Date(job.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
+                              </div>
+                              <div style={{ fontSize: 18, fontWeight: 800, color: '#1e3a5f', lineHeight: 1 }}>
+                                {new Date(job.scheduled_date + 'T00:00:00').getDate()}
+                              </div>
+                            </>
+                          ) : (
+                            <div style={{ fontSize: 11, color: '#9ca3af' }}>TBD</div>
+                          )}
+                        </div>
+                        {/* Job info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {job.title}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                            {[job.job_type, job.technician].filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                        {/* Status + chevron */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '2px 8px', background: sc.bg, color: sc.color, textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
+                            {job.status || 'scheduled'}
+                          </span>
+                          <span style={{ color: '#9ca3af', fontSize: 14 }}>›</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* ── Tasks ── */}
             <div className="card mb-4">
               <div className="card-header">
@@ -776,6 +867,99 @@ export default function CompanyDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Service Job Slide-over ── */}
+      {selectedJob && (
+        <>
+          {/* Backdrop */}
+          <div onClick={() => setSelectedJob(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1000 }} />
+          {/* Panel */}
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: 520,
+            background: '#fff', zIndex: 1001, display: 'flex', flexDirection: 'column',
+            boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
+          }}>
+            {/* Panel header */}
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: 1, marginBottom: 4 }}>SERVICE RECORD</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#1e3a5f' }}>{selectedJob.title}</div>
+              </div>
+              <button onClick={() => setSelectedJob(null)}
+                style={{ background: 'none', border: 'none', fontSize: 20, color: '#9ca3af', cursor: 'pointer', padding: '2px 4px' }}>✕</button>
+            </div>
+
+            {/* Scrollable body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+
+              {/* Meta grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px', fontSize: 13, marginBottom: 20 }}>
+                {[
+                  ['Date', selectedJob.scheduled_date
+                    ? new Date(selectedJob.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })
+                    : 'Not scheduled'],
+                  ['Time', selectedJob.scheduled_time
+                    ? new Date(`2000-01-01T${selectedJob.scheduled_time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                    : '—'],
+                  ['Type', selectedJob.job_type || '—'],
+                  ['Duration', selectedJob.duration_hours ? `${selectedJob.duration_hours}h estimated` : '—'],
+                  ['Technician', selectedJob.technician || 'Unassigned'],
+                  ['Status', selectedJob.status || 'scheduled'],
+                ].map(([label, val]) => (
+                  <div key={label}>
+                    <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 2 }}>{label}</div>
+                    <div style={{ fontWeight: 600, color: '#111827', textTransform: label === 'Status' || label === 'Type' ? 'capitalize' : 'none' }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Tech notes */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>FIELD NOTES</div>
+                {selectedJob.notes ? (
+                  <div style={{ fontSize: 14, color: '#374151', background: '#f9fafb', borderRadius: 8, padding: '12px 14px', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    {selectedJob.notes}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>No field notes recorded.</div>
+                )}
+              </div>
+
+              {/* Photos */}
+              <div>
+                <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  SERVICE PHOTOS {!loadingJobPhotos && `(${jobPhotos.length})`}
+                </div>
+                {loadingJobPhotos ? (
+                  <div style={{ fontSize: 13, color: '#9ca3af' }}>Loading photos…</div>
+                ) : jobPhotos.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>No photos for this service visit.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {jobPhotos.map(photo => {
+                      const isVideo = photo.mimetype?.startsWith('video/');
+                      const fileUrl = `${API}/api/photos/${photo.id}/file`;
+                      return isVideo ? (
+                        <a key={photo.id} href={fileUrl} target="_blank" rel="noreferrer"
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 100, height: 100, borderRadius: 8, background: '#1e3a5f', color: '#fff', textDecoration: 'none', gap: 4 }}>
+                          <span style={{ fontSize: 24 }}>▶</span>
+                          <span style={{ fontSize: 10, fontWeight: 600 }}>Video</span>
+                        </a>
+                      ) : (
+                        <img key={photo.id} src={fileUrl} alt={photo.original_name}
+                          onClick={() => setLightbox({ url: fileUrl, name: photo.original_name })}
+                          style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: '1.5px solid #e5e7eb' }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* ── Photo Lightbox ── */}

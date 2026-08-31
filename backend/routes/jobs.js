@@ -5,7 +5,7 @@ const db = require('../database');
 // GET all jobs — optionally filter by month: ?year=2024&month=8
 router.get('/', (req, res) => {
   try {
-    const { year, month, status } = req.query;
+    const { year, month, status, company_id } = req.query;
     let sql = `
       SELECT j.*, c.name AS company_name, co.first_name || ' ' || co.last_name AS contact_name
       FROM jobs j
@@ -22,6 +22,10 @@ router.get('/', (req, res) => {
     if (status) {
       where.push(`j.status = ?`);
       params.push(status);
+    }
+    if (company_id) {
+      where.push(`j.company_id = ?`);
+      params.push(parseInt(company_id, 10));
     }
     if (where.length) sql += ' WHERE ' + where.join(' AND ');
     sql += ' ORDER BY j.scheduled_date, j.scheduled_time';
