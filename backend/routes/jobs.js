@@ -35,7 +35,8 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   try {
     const job = db.prepare(`
-      SELECT j.*, c.name AS company_name, co.first_name || ' ' || co.last_name AS contact_name
+      SELECT j.*, c.name AS company_name, c.address, c.city, c.state, c.zip,
+        co.first_name || ' ' || co.last_name AS contact_name, co.phone AS contact_phone
       FROM jobs j
       LEFT JOIN companies c ON j.company_id = c.id
       LEFT JOIN contacts co ON j.contact_id = co.id
@@ -118,7 +119,36 @@ router.put('/:id', (req, res) => {
       req.params.id
     );
     const job = db.prepare(`
-      SELECT j.*, c.name AS company_name, co.first_name || ' ' || co.last_name AS contact_name
+      SELECT j.*, c.name AS company_name, c.address, c.city, c.state, c.zip,
+        co.first_name || ' ' || co.last_name AS contact_name, co.phone AS contact_phone
+      FROM jobs j
+      LEFT JOIN companies c ON j.company_id = c.id
+      LEFT JOIN contacts co ON j.contact_id = co.id
+      WHERE j.id = ?
+    `).get(req.params.id);
+    res.json(job);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH quick status update (used by mobile app)
+router.patch('/:id/status', (req, res) => {
+  try {
+    const { status, notes } = req.body;
+    const existing = db.prepare('SELECT * FROM jobs WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+    if (notes) {
+      const combined = [existing.notes, notes].filter(Boolean).join('\n\n');
+      db.prepare('UPDATE jobs SET status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(status || existing.status, combined, req.params.id);
+    } else {
+      db.prepare('UPDATE jobs SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(status || existing.status, req.params.id);
+    }
+    const job = db.prepare(`
+      SELECT j.*, c.name AS company_name, c.address, c.city, c.state, c.zip,
+        co.first_name || ' ' || co.last_name AS contact_name, co.phone AS contact_phone
       FROM jobs j
       LEFT JOIN companies c ON j.company_id = c.id
       LEFT JOIN contacts co ON j.contact_id = co.id
