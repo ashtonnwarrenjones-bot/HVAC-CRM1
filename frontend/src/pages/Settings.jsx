@@ -20,6 +20,8 @@ const DEFAULTS = {
 export default function Settings() {
   const [form, setForm] = useState(DEFAULTS);
   const [saved, setSaved] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [seedMsg, setSeedMsg] = useState(null);
@@ -27,6 +29,8 @@ export default function Settings() {
   useEffect(() => {
     axios.get('/api/settings').then(r => {
       setForm(f => ({ ...f, ...r.data }));
+    }).catch(err => {
+      console.error('Failed to load settings:', err);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -43,9 +47,19 @@ export default function Settings() {
   };
 
   const save = async () => {
-    await axios.put('/api/settings', form);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setSaving(true);
+    setSaveErr('');
+    try {
+      await axios.put('/api/settings', form);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Save failed';
+      setSaveErr(msg);
+      setTimeout(() => setSaveErr(''), 5000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const loadSampleData = async () => {
@@ -69,9 +83,14 @@ export default function Settings() {
     <>
       <div className="page-header">
         <h2>Settings</h2>
-        <button className="btn btn-primary" onClick={save}>
-          {saved ? '✓ Saved!' : 'Save Settings'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {saveErr && (
+            <span style={{ fontSize: 12, color: '#b91c1c', fontWeight: 500 }}>✗ {saveErr}</span>
+          )}
+          <button className="btn btn-primary" onClick={save} disabled={saving}>
+            {saving ? '⏳ Saving…' : saved ? '✓ Saved!' : 'Save Settings'}
+          </button>
+        </div>
       </div>
 
       <div className="page-content">
