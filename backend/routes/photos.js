@@ -17,28 +17,35 @@ const upload = multer({
 });
 
 // ── Ensure job_photos table exists ──
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS job_photos (
-    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id                INTEGER NOT NULL,
-    company_id            INTEGER,
-    filename              TEXT,
-    original_name         TEXT NOT NULL,
-    mimetype              TEXT,
-    size                  INTEGER,
-    storage               TEXT NOT NULL DEFAULT 'local',
-    sharepoint_item_id    TEXT,
-    sharepoint_web_url    TEXT,
-    sharepoint_dl_url     TEXT,
-    uploaded_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
-    uploaded_by           TEXT
-  )
-`).run();
+// Deferred until first request so db has time to initialise via initDb().
+let _tableReady = false;
+function ensureTable() {
+  if (_tableReady) return;
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS job_photos (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id                INTEGER NOT NULL,
+      company_id            INTEGER,
+      filename              TEXT,
+      original_name         TEXT NOT NULL,
+      mimetype              TEXT,
+      size                  INTEGER,
+      storage               TEXT NOT NULL DEFAULT 'local',
+      sharepoint_item_id    TEXT,
+      sharepoint_web_url    TEXT,
+      sharepoint_dl_url     TEXT,
+      uploaded_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
+      uploaded_by           TEXT
+    )
+  `).run();
+  _tableReady = true;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/photos/jobs/:jobId — upload a photo/video for a job
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/jobs/:jobId', upload.single('file'), async (req, res) => {
+  ensureTable();
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   const jobId = parseInt(req.params.jobId, 10);
@@ -109,6 +116,7 @@ router.post('/jobs/:jobId', upload.single('file'), async (req, res) => {
 // GET /api/photos/jobs/:jobId — list photos for a specific job
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/jobs/:jobId', (req, res) => {
+  ensureTable();
   const photos = db.prepare(`
     SELECT * FROM job_photos WHERE job_id = ? ORDER BY uploaded_at DESC
   `).all(parseInt(req.params.jobId, 10));
@@ -119,6 +127,7 @@ router.get('/jobs/:jobId', (req, res) => {
 // GET /api/photos/companies/:companyId — all photos for a company, grouped by job
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/companies/:companyId', (req, res) => {
+  ensureTable();
   const rows = db.prepare(`
     SELECT
       p.*,
@@ -154,6 +163,7 @@ router.get('/companies/:companyId', (req, res) => {
 // GET /api/photos/:id/file — serve or redirect to photo file
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/:id/file', async (req, res) => {
+  ensureTable();
   const photo = db.prepare('SELECT * FROM job_photos WHERE id = ?').get(req.params.id);
   if (!photo) return res.status(404).json({ error: 'Not found' });
 
@@ -178,6 +188,7 @@ router.get('/:id/file', async (req, res) => {
 // DELETE /api/photos/:id
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
+  ensureTable();
   const photo = db.prepare('SELECT * FROM job_photos WHERE id = ?').get(req.params.id);
   if (!photo) return res.status(404).json({ error: 'Not found' });
 
