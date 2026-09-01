@@ -13,6 +13,9 @@ import {
 import Login from './pages/Login';
 import Portal from './pages/Portal';
 import Sign from './pages/Sign';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import MyJobs from './pages/MyJobs';
 import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
 import CompanyDetail from './pages/CompanyDetail';
@@ -29,19 +32,20 @@ import DispatchBoard from './pages/DispatchBoard';
 import Pricebook from './pages/Pricebook';
 import Memberships from './pages/Memberships';
 
-const NAV = [
-  { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true },
-  { to: '/dispatch', label: 'Dispatch', Icon: Trello },
-  { to: '/schedule', label: 'Schedule', Icon: Calendar },
-  { to: '/pipeline', label: 'Pipeline', Icon: Target },
-  { to: '/companies', label: 'Companies', Icon: Building2 },
-  { to: '/contacts', label: 'Contacts', Icon: Users },
-  { to: '/proposals', label: 'Proposals', Icon: FileText },
-  { to: '/equipment', label: 'Equipment', Icon: Wrench },
-  { to: '/invoices', label: 'Invoices', Icon: Receipt },
-  { to: '/memberships', label: 'Memberships', Icon: Shield },
-  { to: '/pricebook', label: 'Pricebook', Icon: BookOpen },
-  { to: '/analytics', label: 'Analytics', Icon: BarChart2 },
+const ALL_NAV = [
+  { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
+  { to: '/my-jobs', label: 'My Jobs', Icon: Wrench, roles: ['technician'] },
+  { to: '/dispatch', label: 'Dispatch', Icon: Trello, roles: ['admin', 'dispatcher', 'demo'] },
+  { to: '/schedule', label: 'Schedule', Icon: Calendar, roles: ['admin', 'dispatcher', 'demo'] },
+  { to: '/pipeline', label: 'Pipeline', Icon: Target, roles: ['admin', 'sales_rep', 'demo'] },
+  { to: '/companies', label: 'Companies', Icon: Building2, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
+  { to: '/contacts', label: 'Contacts', Icon: Users, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
+  { to: '/proposals', label: 'Proposals', Icon: FileText, roles: ['admin', 'sales_rep', 'demo'] },
+  { to: '/equipment', label: 'Equipment', Icon: Wrench, roles: ['admin', 'dispatcher', 'demo'] },
+  { to: '/invoices', label: 'Invoices', Icon: Receipt, roles: ['admin', 'dispatcher', 'demo'] },
+  { to: '/memberships', label: 'Memberships', Icon: Shield, roles: ['admin', 'dispatcher', 'demo'] },
+  { to: '/pricebook', label: 'Pricebook', Icon: BookOpen, roles: ['admin', 'demo'] },
+  { to: '/analytics', label: 'Analytics', Icon: BarChart2, roles: ['admin', 'sales_rep', 'demo'] },
 ];
 
 // ─── Dark mode hook ───────────────────────────────────────────────────────────
@@ -259,7 +263,8 @@ function NotificationsPanel({ onClose }) {
 
 // ─── App Layout ───────────────────────────────────────────────────────────────
 function AppLayout() {
-  const { token, username, logout, isDemo } = useAuth();
+  const { token, username, logout, isDemo, role } = useAuth();
+  const NAV = ALL_NAV.filter(item => item.roles.includes(role || 'admin'));
   const [menuOpen, setMenuOpen]   = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -451,7 +456,9 @@ function AppLayout() {
       {/* ── Main content ── */}
       <main className="main">
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          {/* Technicians land on My Jobs by default */}
+          <Route path="/" element={role === 'technician' ? <Navigate to="/my-jobs" replace /> : <Dashboard />} />
+          <Route path="/my-jobs" element={<MyJobs />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/companies" element={<Companies />} />
@@ -466,7 +473,7 @@ function AppLayout() {
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to={role === 'technician' ? '/my-jobs' : '/'} replace />} />
         </Routes>
       </main>
 
@@ -481,8 +488,10 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public signing page — no auth required */}
+          {/* Public pages — no auth required */}
           <Route path="/sign/:token" element={<Sign />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           {/* Customer portal — has its own auth */}
           <Route path="/portal/*" element={<Portal />} />
           {/* All other routes go through the authenticated layout */}

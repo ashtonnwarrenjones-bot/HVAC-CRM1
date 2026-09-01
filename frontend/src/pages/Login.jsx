@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Logo from '../components/Logo';
 
@@ -209,7 +210,15 @@ export default function Login() {
               </p>
             )}
 
-            <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
+            {mode === 'login' && (
+              <div style={{ marginTop: 12, textAlign: 'center' }}>
+                <Link to="/forgot-password" style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}>
+                  Forgot password?
+                </Link>
+              </div>
+            )}
+
+            <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
               <p style={{ fontSize: 11, color: '#bbb', marginBottom: 4 }}>Demo access</p>
               <p style={{ fontSize: 12, color: '#999' }}>
                 Username: <strong style={{ color: '#555' }}>demo</strong> · Password: <strong style={{ color: '#555' }}>demo123</strong>
