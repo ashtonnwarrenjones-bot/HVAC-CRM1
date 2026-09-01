@@ -22,9 +22,9 @@ function baseUrl(req) {
 // ADMIN — POST /invite/:contactId
 // Mounted at /api/portal/admin  →  handles /api/portal/admin/invite/:contactId
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/invite/:contactId', (req, res) => {
+router.post('/invite/:contactId', async (req, res) => {
   try {
-    const contact = db.prepare(`
+    const contact = await db.prepare(`
       SELECT c.*, co.name AS company_name
       FROM contacts c
       LEFT JOIN companies co ON co.id = c.company_id
@@ -35,13 +35,13 @@ router.post('/invite/:contactId', (req, res) => {
     if (!contact.company_id) return res.status(400).json({ error: 'Contact has no associated company' });
 
     // Revoke any existing token for this contact so only one link is active
-    db.prepare('DELETE FROM portal_tokens WHERE contact_id = ?').run(contact.id);
+    await db.prepare('DELETE FROM portal_tokens WHERE contact_id = ?').run(contact.id);
 
     const token = genToken();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + MAGIC_TOKEN_DAYS);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO portal_tokens (contact_id, company_id, token, expires_at)
       VALUES (?, ?, ?, ?)
     `).run(contact.id, contact.company_id, token, expiresAt.toISOString());
@@ -59,15 +59,12 @@ router.post('/invite/:contactId', (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC — magic link verification
-// server.js calls: app.get('/api/portal/auth/:token', (req, res, next) => portalRouter(req, res, next))
-// The router receives req.url = '/api/portal/auth/:token', so we register both
-// the full path (for the direct call) and the relative path (for app.use mount).
 // ─────────────────────────────────────────────────────────────────────────────
-function handleMagicLink(req, res) {
+async function handleMagicLink(req, res) {
   try {
     const token = req.params.token;
 
-    const row = db.prepare(`
+    const row = await db.prepare(`
       SELECT pt.*, c.first_name, c.last_name, c.email,
              co.name AS company_name
       FROM portal_tokens pt
@@ -82,7 +79,7 @@ function handleMagicLink(req, res) {
     }
 
     // Update last_used timestamp
-    db.prepare('UPDATE portal_tokens SET last_used = CURRENT_TIMESTAMP WHERE token = ?').run(token);
+    await db.prepare('UPDATE portal_tokens SET last_used = CURRENT_TIMESTAMP WHERE token = ?').run(token);
 
     const portalJwt = jwt.sign(
       {
@@ -118,14 +115,13 @@ router.get('/auth/:token', handleMagicLink);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CUSTOMER — all routes below require req.portal (set by portalAuth middleware)
-// Mounted at /api/portal  →  paths are relative (e.g. /me, /proposals, etc.)
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GET /api/portal/me
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   if (!req.portal) return res.status(401).json({ error: 'Not authenticated' });
   try {
-    const company = db.prepare(
+    const company = await db.prepare(
       'SELECT id, name, phone, address, city, state, zip FROM companies WHERE id = ?'
     ).get(req.portal.company_id);
 
@@ -143,10 +139,10 @@ router.get('/me', (req, res) => {
 });
 
 // GET /api/portal/proposals
-router.get('/proposals', (req, res) => {
+router.get('/proposals', async (req, res) => {
   if (!req.portal) return res.status(401).json({ error: 'Not authenticated' });
   try {
-    const proposals = db.prepare(`
+    const proposals = await db.prepare(`
       SELECT id, title, proposal_number, status, service_type,
              subtotal, tax_amount, total_amount, valid_days,
              created_at, signed_at, signed_by, notes
@@ -162,10 +158,10 @@ router.get('/proposals', (req, res) => {
 });
 
 // GET /api/portal/jobs
-router.get('/jobs', (req, res) => {
+router.get('/jobs', async (req, res) => {
   if (!req.portal) return res.status(401).json({ error: 'Not authenticated' });
   try {
-    const jobs = db.prepare(`
+    const jobs = await db.prepare(`
       SELECT id, title, job_type, technician, status,
              scheduled_date, scheduled_time, duration_hours, notes
       FROM jobs
@@ -180,10 +176,10 @@ router.get('/jobs', (req, res) => {
 });
 
 // GET /api/portal/messages
-router.get('/messages', (req, res) => {
+router.get('/messages', async (req, res) => {
   if (!req.portal) return res.status(401).json({ error: 'Not authenticated' });
   try {
-    const messages = db.prepare(`
+    const messages = await db.prepare(`
       SELECT * FROM portal_messages
       WHERE company_id = ? AND contact_id = ?
       ORDER BY created_at DESC
@@ -196,13 +192,13 @@ router.get('/messages', (req, res) => {
 });
 
 // POST /api/portal/messages
-router.post('/messages', (req, res) => {
+router.post('/messages', async (req, res) => {
   if (!req.portal) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const { subject, message } = req.body;
     if (!message?.trim()) return res.status(400).json({ error: 'Message body is required' });
 
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO portal_messages (company_id, contact_id, contact_name, subject, message)
       VALUES (?, ?, ?, ?, ?)
     `).run(
@@ -213,13 +209,13 @@ router.post('/messages', (req, res) => {
       message.trim()
     );
 
-    const msg = db.prepare('SELECT * FROM portal_messages WHERE id = ?').get(result.lastInsertRowid);
+    const msg = await db.prepare('SELECT * FROM portal_messages WHERE id = ?').get(result.lastInsertRowid);
 
     // Create a notification for the admin
     try {
       const { createNotification } = require('../database');
       if (createNotification) {
-        createNotification({
+        await createNotification({
           type: 'portal_message',
           title: `💬 Portal Message: ${msg.subject}`,
           message: `From ${req.portal.contact_name} (${req.portal.company_name}): ${message.trim().slice(0, 80)}${message.trim().length > 80 ? '…' : ''}`,

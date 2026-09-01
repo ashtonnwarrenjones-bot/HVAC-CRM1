@@ -17,28 +17,9 @@ const upload = multer({
 });
 
 // ── Ensure job_photos table exists ──
-// Deferred until first request so db has time to initialise via initDb().
-let _tableReady = false;
+// Table is created by initDb() in database.js — this is a no-op kept for call-site compatibility.
 function ensureTable() {
-  if (_tableReady) return;
-  await db.prepare(`
-    CREATE TABLE IF NOT EXISTS job_photos (
-      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-      job_id                INTEGER NOT NULL,
-      company_id            INTEGER,
-      filename              TEXT,
-      original_name         TEXT NOT NULL,
-      mimetype              TEXT,
-      size                  INTEGER,
-      storage               TEXT NOT NULL DEFAULT 'local',
-      sharepoint_item_id    TEXT,
-      sharepoint_web_url    TEXT,
-      sharepoint_dl_url     TEXT,
-      uploaded_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
-      uploaded_by           TEXT
-    )
-  `).run();
-  _tableReady = true;
+  // no-op: table guaranteed by initDb()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
