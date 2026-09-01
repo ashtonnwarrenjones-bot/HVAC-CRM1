@@ -378,17 +378,17 @@ export default function Settings() {
                     <span className="text-muted">Version</span><span>2.0</span>
                   </div>
                   <div className="flex justify-between" style={{ padding: '4px 0', borderBottom: '1px solid var(--gray-100)' }}>
-                    <span className="text-muted">Backend</span><span>Node.js + Express + SQLite</span>
+                    <span className="text-muted">Backend</span><span>Node.js + Express + PostgreSQL</span>
                   </div>
                   <div className="flex justify-between" style={{ padding: '4px 0', borderBottom: '1px solid var(--gray-100)' }}>
                     <span className="text-muted">Frontend</span><span>React 18 + Vite</span>
                   </div>
                   <div className="flex justify-between" style={{ padding: '4px 0' }}>
-                    <span className="text-muted">Database</span><span>crm.db (SQLite)</span>
+                    <span className="text-muted">Database</span><span>PostgreSQL (Render)</span>
                   </div>
                 </div>
                 <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--blue-50)', borderRadius: 6, fontSize: 12, color: 'var(--blue-700)' }}>
-                  💾 Back up your data by copying <strong>backend/crm.db</strong>
+                  💾 Back up your data using the <strong>Export Backup</strong> button above
                 </div>
               </div>
             </div>
