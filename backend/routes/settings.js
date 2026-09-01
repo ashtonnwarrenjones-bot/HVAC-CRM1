@@ -18,27 +18,56 @@ const DEFAULTS = {
 };
 
 // GET all settings
-router.get('/', (req, res) => {
-  const rows = db.prepare('SELECT key, value FROM settings').all();
-  const out = { ...DEFAULTS };
-  rows.forEach(r => { out[r.key] = r.value; });
-  res.json(out);
+router.get('/', async (req, res) => {
+  try {
+    const rows = await db.prepare('SELECT key, value FROM settings').all();
+    const out = { ...DEFAULTS };
+    rows.forEach(r => { out[r.key] = r.value; });
+    res.json(out);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // PUT update settings (bulk upsert)
-router.put('/', (req, res) => {
-  const upsert = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-  const upsertMany = db.transaction((data) => {
-    for (const [key, value] of Object.entries(data)) {
-      if (key in DEFAULTS) upsert.run(key, value ?? '');
+router.put('/', async (req, res) => {
+  try {
+    for (const [key, value] of Object.entries(req.body)) {
+      if (key in DEFAULTS) {
+        await db.prepare(
+          'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value'
+        ).run(key, value ?? '');
+      }
     }
-  });
-  upsertMany(req.body);
+    const rows = await db.prepare('SELECT key, value FROM settings').all();
+    const out = { ...DEFAULTS };
+    rows.forEach(r => { out[r.key] = r.value; });
+    res.json(out);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
-  const rows = db.prepare('SELECT key, value FROM settings').all();
-  const out = { ...DEFAULTS };
-  rows.forEach(r => { out[r.key] = r.value; });
-  res.json(out);
+// GET /api/settings/backup — full data export as downloadable JSON
+router.get('/backup', async (req, res) => {
+  try {
+    const backup = {
+      exported_at: new Date().toISOString(),
+      version: '1.0',
+      companies:           await db.prepare('SELECT * FROM companies ORDER BY name').all(),
+      contacts:            await db.prepare('SELECT * FROM contacts ORDER BY last_name, first_name').all(),
+      proposals:           await db.prepare('SELECT * FROM proposals ORDER BY created_at DESC').all(),
+      proposal_line_items: await db.prepare('SELECT * FROM proposal_line_items').all(),
+      jobs:                await db.prepare('SELECT * FROM jobs ORDER BY created_at DESC').all(),
+      deals:               await db.prepare('SELECT * FROM deals ORDER BY created_at DESC').all(),
+    };
+    const filename = `conduit-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.json(backup);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;

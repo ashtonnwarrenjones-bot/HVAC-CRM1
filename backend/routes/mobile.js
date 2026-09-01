@@ -203,7 +203,7 @@ router.post('/jobs/:id/time/stop', async (req, res) => {
     await db.prepare(`
       UPDATE job_time_entries
       SET stopped_at = CURRENT_TIMESTAMP,
-          duration_seconds = CAST((julianday(CURRENT_TIMESTAMP) - julianday(started_at)) * 86400 AS INTEGER)
+          duration_seconds = ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)))::INTEGER
       WHERE job_id = ? AND user_id = ? AND stopped_at IS NULL
     `).run(jobId, req.user.id);
     res.json({ ok: true });
@@ -315,7 +315,7 @@ router.get('/techs/locations', async (req, res) => {
       SELECT
         tl.*,
         j.title AS current_job,
-        ROUND((julianday(CURRENT_TIMESTAMP) - julianday(tl.updated_at)) * 1440) || ' min ago' AS updated_ago
+        ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - tl.updated_at)) / 60) || ' min ago' AS updated_ago
       FROM tech_locations tl
       LEFT JOIN jobs j ON j.status = 'in_progress' AND j.company_id IN (
         SELECT company_id FROM jobs WHERE status = 'in_progress' LIMIT 1

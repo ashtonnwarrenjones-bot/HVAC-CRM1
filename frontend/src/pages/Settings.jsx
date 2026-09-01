@@ -26,13 +26,54 @@ export default function Settings() {
   const [seeding, setSeeding] = useState(false);
   const [seedMsg, setSeedMsg] = useState(null);
 
+  // User management state
+  const [users, setUsers] = useState([]);
+  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'technician' });
+  const [userMsg, setUserMsg] = useState(null);
+  const [creatingUser, setCreatingUser] = useState(false);
+
   useEffect(() => {
     axios.get('/api/settings').then(r => {
       setForm(f => ({ ...f, ...r.data }));
     }).catch(err => {
       console.error('Failed to load settings:', err);
     }).finally(() => setLoading(false));
+    loadUsers();
   }, []);
+
+  const loadUsers = () => {
+    axios.get('/api/users').then(r => setUsers(r.data)).catch(() => {});
+  };
+
+  const createUser = async () => {
+    if (!newUser.username || !newUser.password) {
+      setUserMsg({ ok: false, text: 'Username and password are required.' });
+      return;
+    }
+    setCreatingUser(true);
+    setUserMsg(null);
+    try {
+      await axios.post('/api/users', newUser);
+      setNewUser({ username: '', password: '', role: 'technician' });
+      setUserMsg({ ok: true, text: `User "${newUser.username}" created.` });
+      loadUsers();
+    } catch (err) {
+      setUserMsg({ ok: false, text: err.response?.data?.error || 'Failed to create user.' });
+    } finally {
+      setCreatingUser(false);
+      setTimeout(() => setUserMsg(null), 4000);
+    }
+  };
+
+  const deleteUser = async (id, username) => {
+    if (!window.confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+    try {
+      await axios.delete(`/api/users/${id}`);
+      loadUsers();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete user.');
+    }
+  };
 
   const f = (k) => e => setForm(p => ({ ...p, [k]: e.target.value }));
 
@@ -227,6 +268,27 @@ export default function Settings() {
             {/* Salesforce Import */}
             <SalesforceImport />
 
+            {/* Data Backup */}
+            <div className="card mb-4">
+              <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>💾</span>
+                <h3 style={{ margin: 0 }}>Backup Your Data</h3>
+              </div>
+              <div className="card-body">
+                <p style={{ fontSize: 13, color: 'var(--gray-600)', marginBottom: 14, lineHeight: 1.6 }}>
+                  Download a full backup of all your companies, contacts, proposals, jobs, and pipeline deals as a JSON file. Save it somewhere safe — Render's free tier does not persist the database across deploys.
+                </p>
+                <a
+                  href="/api/settings/backup"
+                  download
+                  className="btn btn-secondary"
+                  style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}
+                >
+                  ⬇ Download Backup
+                </a>
+              </div>
+            </div>
+
             <div className="card mb-4">
               <div className="card-header"><h3>Sample Data</h3></div>
               <div className="card-body">
@@ -245,6 +307,65 @@ export default function Settings() {
                   style={{ width: '100%' }}
                 >
                   {seeding ? '⏳ Loading...' : '🌱 Load Sample Data'}
+                </button>
+              </div>
+            </div>
+
+            {/* User Management */}
+            <div className="card mb-4">
+              <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>👥</span>
+                <h3 style={{ margin: 0 }}>User Management</h3>
+              </div>
+              <div className="card-body">
+                {/* Existing users */}
+                {users.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    {users.map(u => (
+                      <div key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>{u.username}</span>
+                          <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 6px', borderRadius: 4, background: u.role === 'admin' ? 'var(--blue-50)' : u.role === 'demo' ? '#f3f4f6' : 'var(--green-50)', color: u.role === 'admin' ? 'var(--blue-700)' : u.role === 'demo' ? '#6b7280' : 'var(--green-700)' }}>{u.role}</span>
+                        </div>
+                        {u.role !== 'demo' && (
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: 11, padding: '3px 8px', color: '#b91c1c' }}
+                            onClick={() => deleteUser(u.id, u.username)}
+                          >Delete</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Create new user */}
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Add New User</div>
+                {userMsg && (
+                  <div style={{ marginBottom: 10, padding: '7px 10px', borderRadius: 6, fontSize: 13, fontWeight: 500, background: userMsg.ok ? 'var(--green-50)' : '#fef2f2', color: userMsg.ok ? 'var(--green-700)' : '#b91c1c' }}>
+                    {userMsg.ok ? '✓ ' : '✗ '}{userMsg.text}
+                  </div>
+                )}
+                <div className="form-grid" style={{ marginBottom: 8 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Username</label>
+                    <input className="form-control" value={newUser.username} onChange={e => setNewUser(u => ({ ...u, username: e.target.value }))} placeholder="jsmith" />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Password</label>
+                    <input className="form-control" type="password" value={newUser.password} onChange={e => setNewUser(u => ({ ...u, password: e.target.value }))} placeholder="Temporary password" />
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginBottom: 10 }}>
+                  <label className="form-label">Role</label>
+                  <select className="form-control" value={newUser.role} onChange={e => setNewUser(u => ({ ...u, role: e.target.value }))}>
+                    <option value="admin">Admin (full access)</option>
+                    <option value="technician">Technician (field access)</option>
+                    <option value="demo">Demo (read-only)</option>
+                  </select>
+                </div>
+                <button className="btn btn-primary" onClick={createUser} disabled={creatingUser} style={{ width: '100%' }}>
+                  {creatingUser ? '⏳ Creating...' : '+ Create User'}
                 </button>
               </div>
             </div>

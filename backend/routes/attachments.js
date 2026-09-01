@@ -22,21 +22,21 @@ const upload = multer({
 });
 
 // GET /api/attachments?company_id=&proposal_id=
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { company_id, proposal_id } = req.query;
   let sql = 'SELECT id, company_id, proposal_id, filename, original_name, mimetype, size, uploaded_at FROM attachments WHERE 1=1';
   const params = [];
   if (company_id)   { sql += ' AND company_id = ?';   params.push(company_id); }
   if (proposal_id)  { sql += ' AND proposal_id = ?';  params.push(proposal_id); }
   sql += ' ORDER BY uploaded_at DESC';
-  res.json(db.prepare(sql).all(...params));
+  res.json(await db.prepare(sql).all(...params));
 });
 
 // POST /api/attachments — multipart form with file + optional company_id / proposal_id
-router.post('/', upload.single('file'), (req, res) => {
+router.post('/', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const { company_id, proposal_id } = req.body;
-  const result = db.prepare(`
+  const result = await db.prepare(`
     INSERT INTO attachments (company_id, proposal_id, filename, original_name, mimetype, size)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(
@@ -47,12 +47,12 @@ router.post('/', upload.single('file'), (req, res) => {
     req.file.mimetype,
     req.file.size
   );
-  res.status(201).json(db.prepare('SELECT * FROM attachments WHERE id = ?').get(result.lastInsertRowid));
+  res.status(201).json(await db.prepare('SELECT * FROM attachments WHERE id = ?').get(result.lastInsertRowid));
 });
 
 // GET /api/attachments/:id/download
-router.get('/:id/download', (req, res) => {
-  const att = db.prepare('SELECT * FROM attachments WHERE id = ?').get(req.params.id);
+router.get('/:id/download', async (req, res) => {
+  const att = await db.prepare('SELECT * FROM attachments WHERE id = ?').get(req.params.id);
   if (!att) return res.status(404).json({ error: 'Not found' });
   const filePath = path.join(UPLOAD_DIR, att.filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File missing from disk' });
@@ -60,12 +60,12 @@ router.get('/:id/download', (req, res) => {
 });
 
 // DELETE /api/attachments/:id
-router.delete('/:id', (req, res) => {
-  const att = db.prepare('SELECT * FROM attachments WHERE id = ?').get(req.params.id);
+router.delete('/:id', async (req, res) => {
+  const att = await db.prepare('SELECT * FROM attachments WHERE id = ?').get(req.params.id);
   if (!att) return res.status(404).json({ error: 'Not found' });
   const filePath = path.join(UPLOAD_DIR, att.filename);
   if (fs.existsSync(filePath)) fs.unlink(filePath, () => {});
-  db.prepare('DELETE FROM attachments WHERE id = ?').run(req.params.id);
+  await db.prepare('DELETE FROM attachments WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 

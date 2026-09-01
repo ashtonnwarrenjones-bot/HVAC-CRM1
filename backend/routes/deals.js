@@ -7,7 +7,7 @@ const STAGE_PROBABILITY = {
 };
 
 // GET all deals (optionally filtered by stage or company)
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { stage, company_id } = req.query;
   let query = `
     SELECT d.*,
@@ -24,12 +24,12 @@ router.get('/', (req, res) => {
   if (stage) { query += ' AND d.stage = ?'; params.push(stage); }
   if (company_id) { query += ' AND d.company_id = ?'; params.push(company_id); }
   query += ' ORDER BY d.updated_at DESC';
-  res.json(db.prepare(query).all(...params));
+  res.json(await db.prepare(query).all(...params));
 });
 
 // GET single deal
-router.get('/:id', (req, res) => {
-  const deal = db.prepare(`
+router.get('/:id', async (req, res) => {
+  const deal = await db.prepare(`
     SELECT d.*,
       co.name AS company_name,
       c.first_name, c.last_name, c.email AS contact_email, c.phone AS contact_phone,
@@ -45,23 +45,23 @@ router.get('/:id', (req, res) => {
 });
 
 // POST create deal
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { company_id, contact_id, proposal_id, title, stage, value, probability, service_type, close_date, notes } = req.body;
   if (!title) return res.status(400).json({ error: 'Title required' });
   const s = stage || 'lead';
-  const result = db.prepare(`
+  const result = await db.prepare(`
     INSERT INTO deals (company_id, contact_id, proposal_id, title, stage, value, probability, service_type, close_date, notes)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(company_id || null, contact_id || null, proposal_id || null, title, s, value || 0,
     probability ?? STAGE_PROBABILITY[s] ?? 20, service_type, close_date, notes);
-  res.status(201).json(db.prepare('SELECT * FROM deals WHERE id = ?').get(result.lastInsertRowid));
+  res.status(201).json(await db.prepare('SELECT * FROM deals WHERE id = ?').get(result.lastInsertRowid));
 });
 
 // PUT update deal (including stage moves)
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const { company_id, contact_id, proposal_id, title, stage, value, probability, service_type, close_date, lost_reason, notes } = req.body;
   const s = stage || 'lead';
-  db.prepare(`
+  await db.prepare(`
     UPDATE deals SET
       company_id = ?, contact_id = ?, proposal_id = ?, title = ?, stage = ?,
       value = ?, probability = ?, service_type = ?, close_date = ?, lost_reason = ?, notes = ?,
@@ -70,7 +70,7 @@ router.put('/:id', (req, res) => {
   `).run(company_id || null, contact_id || null, proposal_id || null, title, s, value || 0,
     probability ?? STAGE_PROBABILITY[s] ?? 20, service_type, close_date, lost_reason, notes,
     req.params.id);
-  res.json(db.prepare(`
+  res.json(await db.prepare(`
     SELECT d.*, co.name AS company_name, c.first_name, c.last_name
     FROM deals d
     LEFT JOIN companies co ON d.company_id = co.id
@@ -80,24 +80,24 @@ router.put('/:id', (req, res) => {
 });
 
 // PATCH stage only (quick move from Kanban)
-router.patch('/:id/stage', (req, res) => {
+router.patch('/:id/stage', async (req, res) => {
   const { stage, lost_reason } = req.body;
   if (!stage) return res.status(400).json({ error: 'Stage required' });
-  db.prepare(`
+  await db.prepare(`
     UPDATE deals SET stage = ?, probability = ?, lost_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
   `).run(stage, STAGE_PROBABILITY[stage] ?? 20, lost_reason || null, req.params.id);
   res.json({ ok: true });
 });
 
 // DELETE deal
-router.delete('/:id', (req, res) => {
-  db.prepare('DELETE FROM deals WHERE id = ?').run(req.params.id);
+router.delete('/:id', async (req, res) => {
+  await db.prepare('DELETE FROM deals WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
 // GET pipeline summary (grouped by stage)
-router.get('/summary/by-stage', (req, res) => {
-  const rows = db.prepare(`
+router.get('/summary/by-stage', async (req, res) => {
+  const rows = await db.prepare(`
     SELECT stage,
       COUNT(*) AS count,
       SUM(value) AS total_value,

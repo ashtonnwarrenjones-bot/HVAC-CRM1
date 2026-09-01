@@ -21,7 +21,7 @@ const upload = multer({
 let _tableReady = false;
 function ensureTable() {
   if (_tableReady) return;
-  db.prepare(`
+  await db.prepare(`
     CREATE TABLE IF NOT EXISTS job_photos (
       id                    INTEGER PRIMARY KEY AUTOINCREMENT,
       job_id                INTEGER NOT NULL,
@@ -49,7 +49,7 @@ router.post('/jobs/:jobId', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   const jobId = parseInt(req.params.jobId, 10);
-  const job = db.prepare(`
+  const job = await db.prepare(`
     SELECT j.id, j.title, j.scheduled_date, j.company_id, c.name AS company_name
     FROM jobs j
     LEFT JOIN companies c ON c.id = j.company_id
@@ -90,7 +90,7 @@ router.post('/jobs/:jobId', upload.single('file'), async (req, res) => {
     fs.writeFileSync(path.join(UPLOAD_DIR, filename), req.file.buffer);
   }
 
-  const info = db.prepare(`
+  const info = await db.prepare(`
     INSERT INTO job_photos
       (job_id, company_id, filename, original_name, mimetype, size, storage,
        sharepoint_item_id, sharepoint_web_url, sharepoint_dl_url, uploaded_by)
@@ -109,15 +109,15 @@ router.post('/jobs/:jobId', upload.single('file'), async (req, res) => {
     req.user?.username || null
   );
 
-  res.status(201).json(db.prepare('SELECT * FROM job_photos WHERE id = ?').get(info.lastInsertRowid));
+  res.status(201).json(await db.prepare('SELECT * FROM job_photos WHERE id = ?').get(info.lastInsertRowid));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/photos/jobs/:jobId — list photos for a specific job
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/jobs/:jobId', (req, res) => {
+router.get('/jobs/:jobId', async (req, res) => {
   ensureTable();
-  const photos = db.prepare(`
+  const photos = await db.prepare(`
     SELECT * FROM job_photos WHERE job_id = ? ORDER BY uploaded_at DESC
   `).all(parseInt(req.params.jobId, 10));
   res.json(photos);
@@ -126,9 +126,9 @@ router.get('/jobs/:jobId', (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/photos/companies/:companyId — all photos for a company, grouped by job
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/companies/:companyId', (req, res) => {
+router.get('/companies/:companyId', async (req, res) => {
   ensureTable();
-  const rows = db.prepare(`
+  const rows = await db.prepare(`
     SELECT
       p.*,
       j.title   AS job_title,
@@ -164,7 +164,7 @@ router.get('/companies/:companyId', (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/:id/file', async (req, res) => {
   ensureTable();
-  const photo = db.prepare('SELECT * FROM job_photos WHERE id = ?').get(req.params.id);
+  const photo = await db.prepare('SELECT * FROM job_photos WHERE id = ?').get(req.params.id);
   if (!photo) return res.status(404).json({ error: 'Not found' });
 
   if (photo.storage === 'sharepoint') {
@@ -189,7 +189,7 @@ router.get('/:id/file', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   ensureTable();
-  const photo = db.prepare('SELECT * FROM job_photos WHERE id = ?').get(req.params.id);
+  const photo = await db.prepare('SELECT * FROM job_photos WHERE id = ?').get(req.params.id);
   if (!photo) return res.status(404).json({ error: 'Not found' });
 
   if (photo.storage === 'sharepoint' && photo.sharepoint_item_id) {
@@ -199,7 +199,7 @@ router.delete('/:id', async (req, res) => {
     if (fs.existsSync(filePath)) fs.unlink(filePath, () => {});
   }
 
-  db.prepare('DELETE FROM job_photos WHERE id = ?').run(req.params.id);
+  await db.prepare('DELETE FROM job_photos WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 

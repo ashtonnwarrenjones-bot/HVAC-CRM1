@@ -10,7 +10,7 @@ const db = require('../database');
 
 // Helper: load settings with defaults
 function getSettings() {
-  const rows = db.prepare('SELECT key, value FROM settings').all();
+  const rows = await db.prepare('SELECT key, value FROM settings').all();
   const defaults = {
     company_name: 'Your Company Name',
     company_phone: '(555) 000-0000',
@@ -52,19 +52,19 @@ function generateProposalNumber() {
 
 // Helper: recalc totals
 function recalcTotals(proposalId) {
-  const items = db.prepare('SELECT * FROM proposal_line_items WHERE proposal_id = ?').all(proposalId);
+  const items = await db.prepare('SELECT * FROM proposal_line_items WHERE proposal_id = ?').all(proposalId);
   const subtotal = items.reduce((sum, i) => sum + (i.total_price || 0), 0);
-  const proposal = db.prepare('SELECT tax_rate FROM proposals WHERE id = ?').get(proposalId);
+  const proposal = await db.prepare('SELECT tax_rate FROM proposals WHERE id = ?').get(proposalId);
   const taxAmount = subtotal * ((proposal?.tax_rate || 0) / 100);
   const total = subtotal + taxAmount;
-  db.prepare('UPDATE proposals SET subtotal = ?, tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+  await db.prepare('UPDATE proposals SET subtotal = ?, tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
     .run(subtotal, taxAmount, total, proposalId);
   return { subtotal, taxAmount, total };
 }
 
 // GET all proposals
-router.get('/', (req, res) => {
-  const proposals = db.prepare(`
+router.get('/', async (req, res) => {
+  const proposals = await db.prepare(`
     SELECT p.*, co.name AS company_name, c.first_name, c.last_name
     FROM proposals p
     LEFT JOIN companies co ON p.company_id = co.id
@@ -75,8 +75,8 @@ router.get('/', (req, res) => {
 });
 
 // GET single proposal with line items
-router.get('/:id', (req, res) => {
-  const proposal = db.prepare(`
+router.get('/:id', async (req, res) => {
+  const proposal = await db.prepare(`
     SELECT p.*, co.name AS company_name, co.address AS company_address,
       co.city AS company_city, co.state AS company_state, co.zip AS company_zip,
       c.first_name, c.last_name, c.email AS contact_email, c.phone AS contact_phone, c.title AS contact_title
@@ -88,7 +88,7 @@ router.get('/:id', (req, res) => {
 
   if (!proposal) return res.status(404).json({ error: 'Proposal not found' });
 
-  proposal.line_items = db.prepare(
+  proposal.line_items = await db.prepare(
     'SELECT * FROM proposal_line_items WHERE proposal_id = ? ORDER BY sort_order ASC, id ASC'
   ).all(req.params.id);
 
@@ -96,7 +96,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST create proposal (manual)
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const {
     company_id, contact_id, title, service_type,
     tax_rate, valid_days, notes, terms, line_items
@@ -105,7 +105,7 @@ router.post('/', (req, res) => {
   if (!title) return res.status(400).json({ error: 'Proposal title is required' });
 
   const proposalNumber = generateProposalNumber();
-  const result = db.prepare(`
+  const result = await db.prepare(`
     INSERT INTO proposals (company_id, contact_id, title, proposal_number, service_type, tax_rate, valid_days, notes, terms)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(company_id || null, contact_id || null, title, proposalNumber,
@@ -115,24 +115,24 @@ router.post('/', (req, res) => {
 
   // Insert line items if provided
   if (Array.isArray(line_items)) {
-    const insertItem = db.prepare(`
+    const insertItem = await db.prepare(`
       INSERT INTO proposal_line_items (proposal_id, description, quantity, unit, unit_price, total_price, sort_order)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     line_items.forEach((item, idx) => {
       const qty = parseFloat(item.quantity) || 1;
       const price = parseFloat(item.unit_price) || 0;
-      insertItem.run(proposalId, item.description, qty, item.unit || 'ea', price, qty * price, idx);
+      await insertItem.run(proposalId, item.description, qty, item.unit || 'ea', price, qty * price, idx);
     });
     recalcTotals(proposalId);
   }
 
-  const proposal = db.prepare('SELECT * FROM proposals WHERE id = ?').get(proposalId);
+  const proposal = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(proposalId);
   res.status(201).json(proposal);
 });
 
 // POST upload Excel → parse line items preview
-router.post('/parse-excel', upload.single('file'), (req, res) => {
+router.post('/parse-excel', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   try {
@@ -179,13 +179,13 @@ router.post('/parse-excel', upload.single('file'), (req, res) => {
 });
 
 // PUT update proposal
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const {
     company_id, contact_id, title, service_type, status,
     tax_rate, valid_days, notes, terms, line_items
   } = req.body;
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE proposals SET
       company_id = ?, contact_id = ?, title = ?, service_type = ?, status = ?,
       tax_rate = ?, valid_days = ?, notes = ?, terms = ?,
@@ -196,32 +196,32 @@ router.put('/:id', (req, res) => {
 
   // Replace line items if provided
   if (Array.isArray(line_items)) {
-    db.prepare('DELETE FROM proposal_line_items WHERE proposal_id = ?').run(req.params.id);
-    const insertItem = db.prepare(`
+    await db.prepare('DELETE FROM proposal_line_items WHERE proposal_id = ?').run(req.params.id);
+    const insertItem = await db.prepare(`
       INSERT INTO proposal_line_items (proposal_id, description, quantity, unit, unit_price, total_price, sort_order)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     line_items.forEach((item, idx) => {
       const qty = parseFloat(item.quantity) || 1;
       const price = parseFloat(item.unit_price) || 0;
-      insertItem.run(req.params.id, item.description, qty, item.unit || 'ea', price, qty * price, idx);
+      await insertItem.run(req.params.id, item.description, qty, item.unit || 'ea', price, qty * price, idx);
     });
     recalcTotals(req.params.id);
   }
 
-  const proposal = db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
+  const proposal = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
   res.json(proposal);
 });
 
 // DELETE proposal
-router.delete('/:id', (req, res) => {
-  db.prepare('DELETE FROM proposals WHERE id = ?').run(req.params.id);
+router.delete('/:id', async (req, res) => {
+  await db.prepare('DELETE FROM proposals WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
 // GET download PDF
-router.get('/:id/pdf', (req, res) => {
-  const proposal = db.prepare(`
+router.get('/:id/pdf', async (req, res) => {
+  const proposal = await db.prepare(`
     SELECT p.*, co.name AS company_name, co.address AS company_address,
       co.city AS company_city, co.state AS company_state, co.zip AS company_zip,
       co.phone AS company_phone,
@@ -234,7 +234,7 @@ router.get('/:id/pdf', (req, res) => {
 
   if (!proposal) return res.status(404).json({ error: 'Proposal not found' });
 
-  const lineItems = db.prepare(
+  const lineItems = await db.prepare(
     'SELECT * FROM proposal_line_items WHERE proposal_id = ? ORDER BY sort_order ASC, id ASC'
   ).all(req.params.id);
 
@@ -398,12 +398,12 @@ router.get('/:id/pdf', (req, res) => {
 });
 
 // POST /:id/request-signature — generate a signing token and return the signing URL
-router.post('/:id/request-signature', (req, res) => {
-  const proposal = db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
+router.post('/:id/request-signature', async (req, res) => {
+  const proposal = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
   if (!proposal) return res.status(404).json({ error: 'Proposal not found' });
 
   const token = crypto.randomBytes(24).toString('hex');
-  db.prepare('UPDATE proposals SET signature_token = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+  await db.prepare('UPDATE proposals SET signature_token = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
     .run(token, 'sent', req.params.id);
 
   const baseUrl = req.headers.origin || `${req.protocol}://${req.get('host')}`;
@@ -411,8 +411,8 @@ router.post('/:id/request-signature', (req, res) => {
 });
 
 // GET /sign/:token — PUBLIC: return proposal summary for the signer (no auth)
-router.get('/sign/:token', (req, res) => {
-  const proposal = db.prepare(`
+router.get('/sign/:token', async (req, res) => {
+  const proposal = await db.prepare(`
     SELECT p.id, p.title, p.proposal_number, p.total_amount, p.subtotal, p.tax_rate, p.tax_amount,
            p.status, p.signed_at, p.signed_by, p.notes, p.terms,
            co.name AS company_name
@@ -423,7 +423,7 @@ router.get('/sign/:token', (req, res) => {
 
   if (!proposal) return res.status(404).json({ error: 'Invalid or expired signing link' });
 
-  const lineItems = db.prepare(
+  const lineItems = await db.prepare(
     'SELECT * FROM proposal_line_items WHERE proposal_id = ? ORDER BY sort_order ASC, id ASC'
   ).all(proposal.id);
 
@@ -431,15 +431,15 @@ router.get('/sign/:token', (req, res) => {
 });
 
 // POST /sign/:token — PUBLIC: submit signature (no auth)
-router.post('/sign/:token', (req, res) => {
+router.post('/sign/:token', async (req, res) => {
   const { signed_by } = req.body;
   if (!signed_by || !signed_by.trim()) return res.status(400).json({ error: 'Full name is required to sign' });
 
-  const proposal = db.prepare('SELECT id, status, signed_at, title, company_id FROM proposals WHERE signature_token = ?').get(req.params.token);
+  const proposal = await db.prepare('SELECT id, status, signed_at, title, company_id FROM proposals WHERE signature_token = ?').get(req.params.token);
   if (!proposal) return res.status(404).json({ error: 'Invalid or expired signing link' });
   if (proposal.signed_at) return res.status(409).json({ error: 'This proposal has already been signed' });
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE proposals SET signed_by = ?, signed_at = CURRENT_TIMESTAMP,
       status = 'accepted', updated_at = CURRENT_TIMESTAMP
     WHERE signature_token = ?
@@ -449,9 +449,9 @@ router.post('/sign/:token', (req, res) => {
   try {
     const { createNotification } = require('../database');
     const company = proposal.company_id
-      ? db.prepare('SELECT name, sales_rep_name FROM companies WHERE id = ?').get(proposal.company_id)
+      ? await db.prepare('SELECT name, sales_rep_name FROM companies WHERE id = ?').get(proposal.company_id)
       : null;
-    createNotification({
+    await createNotification({
       type: 'proposal_signed',
       title: `✅ Proposal Signed: ${proposal.title}`,
       message: `Signed by ${signed_by.trim()}${company ? ` — ${company.name}` : ''}`,

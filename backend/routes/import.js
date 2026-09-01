@@ -102,14 +102,14 @@ function mapContact(row) {
 router.post(
   '/salesforce/preview',
   upload.fields([{ name: 'accounts', maxCount: 1 }, { name: 'contacts', maxCount: 1 }]),
-  (req, res) => {
+  async (req, res) => {
     try {
       const result = { accounts: [], contacts: [] };
 
       if (req.files?.accounts?.[0]) {
         const rows = parseCSV(req.files.accounts[0].buffer);
         result.accounts = rows.map(mapAccount).filter(a => a.name).map(a => {
-          const existing = db.prepare('SELECT id FROM companies WHERE LOWER(name) = LOWER(?)').get(a.name);
+          const existing = await db.prepare('SELECT id FROM companies WHERE LOWER(name) = LOWER(?)').get(a.name);
           return { ...a, _exists: !!existing };
         });
       }
@@ -118,7 +118,7 @@ router.post(
         const rows = parseCSV(req.files.contacts[0].buffer);
         result.contacts = rows.map(mapContact).filter(c => c.last_name || c.first_name).map(c => {
           const exists = c.email
-            ? !!db.prepare('SELECT id FROM contacts WHERE LOWER(email) = LOWER(?)').get(c.email)
+            ? !!await db.prepare('SELECT id FROM contacts WHERE LOWER(email) = LOWER(?)').get(c.email)
             : false;
           return { ...c, _exists: exists };
         });
@@ -138,7 +138,7 @@ router.post(
 router.post(
   '/salesforce/execute',
   upload.fields([{ name: 'accounts', maxCount: 1 }, { name: 'contacts', maxCount: 1 }]),
-  (req, res) => {
+  async (req, res) => {
     try {
       const skipDupes = req.body.skip_duplicates !== 'false';
       const summary = {
@@ -151,7 +151,7 @@ router.post(
 
       // Pre-load company map (name.lower → id) so contacts can link to newly-created companies
       const companyMap = {};
-      db.prepare('SELECT id, LOWER(name) AS key FROM companies').all()
+      await db.prepare('SELECT id, LOWER(name) AS key FROM companies').all()
         .forEach(c => { companyMap[c.key] = c.id; });
 
       // ── Import Accounts ──────────────────────────────────────────────────
@@ -167,7 +167,7 @@ router.post(
           }
 
           try {
-            const r = db.prepare(`
+            const r = await db.prepare(`
               INSERT INTO companies (name, phone, website, address, city, state, zip, annual_revenue, notes)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
@@ -196,7 +196,7 @@ router.post(
           if (!m.first_name && !m.last_name) continue;
 
           if (m.email && skipDupes) {
-            const dupe = db.prepare('SELECT id FROM contacts WHERE LOWER(email) = LOWER(?)').get(m.email);
+            const dupe = await db.prepare('SELECT id FROM contacts WHERE LOWER(email) = LOWER(?)').get(m.email);
             if (dupe) { summary.contacts_skipped++; continue; }
           }
 
@@ -209,7 +209,7 @@ router.post(
             } else {
               // Create a stub company so the contact is linked
               try {
-                const r = db.prepare(
+                const r = await db.prepare(
                   'INSERT INTO companies (name) VALUES (?)'
                 ).run(m.company_name);
                 company_id = r.lastInsertRowid;
@@ -222,7 +222,7 @@ router.post(
           }
 
           try {
-            db.prepare(`
+            await db.prepare(`
               INSERT INTO contacts (company_id, first_name, last_name, title, email, phone, mobile, notes)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `).run(

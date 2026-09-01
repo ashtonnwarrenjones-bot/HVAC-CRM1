@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../database');
 
 // GET all contacts (with optional search/filter)
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { search, company_id } = req.query;
   let query = `
     SELECT c.*, co.name AS company_name
@@ -23,13 +23,13 @@ router.get('/', (req, res) => {
   }
 
   query += ` ORDER BY c.last_name ASC, c.first_name ASC`;
-  const contacts = db.prepare(query).all(...params);
+  const contacts = await db.prepare(query).all(...params);
   res.json(contacts);
 });
 
 // GET single contact
-router.get('/:id', (req, res) => {
-  const contact = db.prepare(`
+router.get('/:id', async (req, res) => {
+  const contact = await db.prepare(`
     SELECT c.*, co.name AS company_name
     FROM contacts c
     LEFT JOIN companies co ON c.company_id = co.id
@@ -41,7 +41,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST create contact
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const {
     company_id, first_name, last_name, title, email,
     phone, mobile, preferred_contact, is_primary, notes
@@ -51,14 +51,14 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'First and last name are required' });
   }
 
-  const result = db.prepare(`
+  const result = await db.prepare(`
     INSERT INTO contacts (company_id, first_name, last_name, title, email,
       phone, mobile, preferred_contact, is_primary, notes)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(company_id || null, first_name, last_name, title, email,
     phone, mobile, preferred_contact || 'email', is_primary ? 1 : 0, notes);
 
-  const contact = db.prepare(`
+  const contact = await db.prepare(`
     SELECT c.*, co.name AS company_name
     FROM contacts c
     LEFT JOIN companies co ON c.company_id = co.id
@@ -69,13 +69,13 @@ router.post('/', (req, res) => {
 });
 
 // PUT update contact
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const {
     company_id, first_name, last_name, title, email,
     phone, mobile, preferred_contact, is_primary, notes
   } = req.body;
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE contacts SET
       company_id = ?, first_name = ?, last_name = ?, title = ?, email = ?,
       phone = ?, mobile = ?, preferred_contact = ?, is_primary = ?, notes = ?,
@@ -85,7 +85,7 @@ router.put('/:id', (req, res) => {
     phone, mobile, preferred_contact, is_primary ? 1 : 0, notes,
     req.params.id);
 
-  const contact = db.prepare(`
+  const contact = await db.prepare(`
     SELECT c.*, co.name AS company_name
     FROM contacts c
     LEFT JOIN companies co ON c.company_id = co.id
@@ -96,8 +96,8 @@ router.put('/:id', (req, res) => {
 });
 
 // DELETE contact
-router.delete('/:id', (req, res) => {
-  db.prepare('DELETE FROM contacts WHERE id = ?').run(req.params.id);
+router.delete('/:id', async (req, res) => {
+  await db.prepare('DELETE FROM contacts WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
