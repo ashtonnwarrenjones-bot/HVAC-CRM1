@@ -46,6 +46,9 @@ app.use('/api/photos', requireAuth, demoGuard, require('./routes/photos'));
 app.use('/api/import', requireAuth, demoGuard, require('./routes/import'));
 app.use('/api/equipment', requireAuth, demoGuard, require('./routes/equipment'));
 app.use('/api/invoices', requireAuth, demoGuard, require('./routes/invoices'));
+app.use('/api/pricebook', requireAuth, demoGuard, require('./routes/pricebook'));
+app.use('/api/memberships', requireAuth, demoGuard, require('./routes/memberships'));
+app.use('/api/analytics', requireAuth, require('./routes/analytics'));
 app.use('/api/search', requireAuth, require('./routes/search'));
 app.use('/api/mobile', requireAuth, require('./routes/mobile'));
 

@@ -7,7 +7,8 @@ import {
   LayoutDashboard, Calendar, Target, Building2, Users,
   FileText, BarChart2, Settings as SettingsIcon, Globe,
   Bell, LogOut, Menu, X, CheckCircle, Clock, Trash2,
-  Search, Wrench, Receipt, Command, Sun, Moon
+  Search, Wrench, Receipt, Command, Sun, Moon,
+  BookOpen, Shield, Trello
 } from 'lucide-react';
 import Login from './pages/Login';
 import Portal from './pages/Portal';
@@ -24,9 +25,13 @@ import Settings from './pages/Settings';
 import Analytics from './pages/Analytics';
 import Equipment from './pages/Equipment';
 import Invoices from './pages/Invoices';
+import DispatchBoard from './pages/DispatchBoard';
+import Pricebook from './pages/Pricebook';
+import Memberships from './pages/Memberships';
 
 const NAV = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true },
+  { to: '/dispatch', label: 'Dispatch', Icon: Trello },
   { to: '/schedule', label: 'Schedule', Icon: Calendar },
   { to: '/pipeline', label: 'Pipeline', Icon: Target },
   { to: '/companies', label: 'Companies', Icon: Building2 },
@@ -34,6 +39,8 @@ const NAV = [
   { to: '/proposals', label: 'Proposals', Icon: FileText },
   { to: '/equipment', label: 'Equipment', Icon: Wrench },
   { to: '/invoices', label: 'Invoices', Icon: Receipt },
+  { to: '/memberships', label: 'Memberships', Icon: Shield },
+  { to: '/pricebook', label: 'Pricebook', Icon: BookOpen },
   { to: '/analytics', label: 'Analytics', Icon: BarChart2 },
 ];
 
@@ -454,6 +461,9 @@ function AppLayout() {
           <Route path="/proposals/:id" element={<ProposalDetail />} />
           <Route path="/equipment" element={<Equipment />} />
           <Route path="/invoices" element={<Invoices />} />
+          <Route path="/dispatch" element={<DispatchBoard />} />
+          <Route path="/pricebook" element={<Pricebook />} />
+          <Route path="/memberships" element={<Memberships />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />

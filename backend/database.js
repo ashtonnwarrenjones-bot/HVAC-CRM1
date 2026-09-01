@@ -365,6 +365,35 @@ const SCHEMA_STATEMENTS = [
     paid_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+
+  // Pricebook / Service Catalog
+  `CREATE TABLE IF NOT EXISTS pricebook_items (
+    id SERIAL PRIMARY KEY,
+    category TEXT,
+    name TEXT NOT NULL,
+    description TEXT,
+    unit_price REAL NOT NULL DEFAULT 0,
+    unit TEXT DEFAULT 'each',
+    cost REAL DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // Memberships / Maintenance Plans
+  `CREATE TABLE IF NOT EXISTS memberships (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+    contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+    plan_name TEXT NOT NULL,
+    plan_type TEXT DEFAULT 'monthly',
+    price REAL NOT NULL DEFAULT 0,
+    status TEXT DEFAULT 'active',
+    start_date DATE,
+    next_service_date DATE,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 
 // ─── Demo data seeder ─────────────────────────────────────────────────────────
@@ -629,6 +658,10 @@ async function initDb() {
     "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS dispatch_notes TEXT",
     "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS equipment_serial TEXT",
     "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS equipment_model TEXT",
+    "ALTER TABLE companies ADD COLUMN IF NOT EXISTS lead_source TEXT",
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lead_source TEXT",
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP",
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS invoice_created BOOLEAN DEFAULT FALSE",
   ];
 
   for (const sql of columnMigrations) {
