@@ -6,8 +6,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Auth routes (public)
 app.use('/api/auth', require('./routes/auth'));
@@ -44,6 +44,7 @@ app.use('/api/notifications', requireAuth, require('./routes/notifications'));
 app.use('/api/users', requireAuth, demoGuard, require('./routes/users'));
 app.use('/api/photos', requireAuth, demoGuard, require('./routes/photos'));
 app.use('/api/import', requireAuth, demoGuard, require('./routes/import'));
+app.use('/api/mobile', requireAuth, require('./routes/mobile'));
 
 // Portal admin routes (admin JWT required)
 app.use('/api/portal/admin', requireAuth, demoGuard, portalRouter);
