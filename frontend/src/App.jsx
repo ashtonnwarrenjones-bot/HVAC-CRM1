@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Logo from './components/Logo';
 import axios from 'axios';
 import {
   LayoutDashboard, Calendar, Target, Building2, Users,
   FileText, BarChart2, Settings as SettingsIcon, Globe,
-  Bell, LogOut, Menu, X, CheckCircle, Clock, Trash2
+  Bell, LogOut, Menu, X, CheckCircle, Clock, Trash2,
+  Search, Wrench, Receipt, Command, Sun, Moon
 } from 'lucide-react';
 import Login from './pages/Login';
 import Portal from './pages/Portal';
@@ -21,6 +22,8 @@ import Pipeline from './pages/Pipeline';
 import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
 import Analytics from './pages/Analytics';
+import Equipment from './pages/Equipment';
+import Invoices from './pages/Invoices';
 
 const NAV = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true },
@@ -29,9 +32,166 @@ const NAV = [
   { to: '/companies', label: 'Companies', Icon: Building2 },
   { to: '/contacts', label: 'Contacts', Icon: Users },
   { to: '/proposals', label: 'Proposals', Icon: FileText },
+  { to: '/equipment', label: 'Equipment', Icon: Wrench },
+  { to: '/invoices', label: 'Invoices', Icon: Receipt },
   { to: '/analytics', label: 'Analytics', Icon: BarChart2 },
 ];
 
+// ─── Dark mode hook ───────────────────────────────────────────────────────────
+function useDarkMode() {
+  const [dark, setDark] = useState(() => {
+    try { return localStorage.getItem('crm_theme') === 'dark'; } catch { return false; }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    try { localStorage.setItem('crm_theme', dark ? 'dark' : 'light'); } catch {}
+  }, [dark]);
+
+  return [dark, setDark];
+}
+
+// ─── Global Search ────────────────────────────────────────────────────────────
+function GlobalSearch({ onClose }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef();
+  const navigate = useNavigate();
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    if (q.length < 2) { setResults(null); return; }
+    const t = setTimeout(() => {
+      setLoading(true);
+      axios.get('/api/search', { params: { q } })
+        .then(r => setResults(r.data))
+        .catch(() => setResults(null))
+        .finally(() => setLoading(false));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const go = (path) => { navigate(path); onClose(); };
+
+  const total = results
+    ? (results.companies?.length + results.contacts?.length + results.proposals?.length + results.jobs?.length)
+    : 0;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      zIndex: 500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      paddingTop: 80
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: 'var(--bg-card)', borderRadius: 12, width: '100%', maxWidth: 560,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden',
+        border: '1px solid var(--border)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)', gap: 10 }}>
+          <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="Search companies, contacts, proposals, jobs…"
+            style={{
+              flex: 1, border: 'none', outline: 'none', fontSize: 15,
+              background: 'transparent', color: 'var(--text-primary)'
+            }}
+            onKeyDown={e => e.key === 'Escape' && onClose()}
+          />
+          {loading && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>…</span>}
+          <kbd style={{ fontSize: 11, background: 'var(--bg-page)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px', color: 'var(--text-muted)' }}>Esc</kbd>
+        </div>
+        {results && (
+          <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+            {total === 0 && (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>No results for "{q}"</div>
+            )}
+            {results.companies?.length > 0 && (
+              <div>
+                <div style={{ padding: '8px 16px 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Companies</div>
+                {results.companies.map(c => (
+                  <div key={c.id} onClick={() => go(`/companies/${c.id}`)}
+                    style={{ padding: '9px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+                    className="search-result-row"
+                  >
+                    <Building2 size={15} style={{ color: 'var(--blue-600)', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{c.name}</div>
+                      {(c.city || c.state) && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{[c.city, c.state].filter(Boolean).join(', ')}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {results.contacts?.length > 0 && (
+              <div>
+                <div style={{ padding: '8px 16px 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Contacts</div>
+                {results.contacts.map(c => (
+                  <div key={c.id} onClick={() => go(`/companies/${c.company_id}`)}
+                    style={{ padding: '9px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+                    className="search-result-row"
+                  >
+                    <Users size={15} style={{ color: '#7c3aed', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{c.first_name} {c.last_name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{c.title}{c.company_name ? ` · ${c.company_name}` : ''}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {results.proposals?.length > 0 && (
+              <div>
+                <div style={{ padding: '8px 16px 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Proposals</div>
+                {results.proposals.map(p => (
+                  <div key={p.id} onClick={() => go(`/proposals/${p.id}`)}
+                    style={{ padding: '9px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+                    className="search-result-row"
+                  >
+                    <FileText size={15} style={{ color: '#0891b2', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{p.title}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.proposal_number} · {p.company_name}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {results.jobs?.length > 0 && (
+              <div>
+                <div style={{ padding: '8px 16px 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Jobs</div>
+                {results.jobs.map(j => (
+                  <div key={j.id} onClick={() => go('/schedule')}
+                    style={{ padding: '9px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+                    className="search-result-row"
+                  >
+                    <Calendar size={15} style={{ color: 'var(--green-600)', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{j.title}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{j.company_name}{j.technician ? ` · ${j.technician}` : ''}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {!results && q.length < 2 && (
+          <div style={{ padding: '20px 16px', fontSize: 13, color: 'var(--text-muted)' }}>
+            Type at least 2 characters to search across your CRM data.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Notifications Panel ──────────────────────────────────────────────────────
 function NotificationsPanel({ onClose }) {
   const [data, setData] = useState({ notifications: [], unread: 0 });
 
@@ -39,21 +199,9 @@ function NotificationsPanel({ onClose }) {
 
   useEffect(() => { load(); }, []);
 
-  const markAllRead = async () => {
-    await axios.put('/api/notifications/read-all');
-    load();
-  };
-
-  const markRead = async (id) => {
-    await axios.put(`/api/notifications/${id}/read`);
-    load();
-  };
-
-  const dismiss = async (id, e) => {
-    e.stopPropagation();
-    await axios.delete(`/api/notifications/${id}`);
-    load();
-  };
+  const markAllRead = async () => { await axios.put('/api/notifications/read-all'); load(); };
+  const markRead   = async (id) => { await axios.put(`/api/notifications/${id}/read`); load(); };
+  const dismiss    = async (id, e) => { e.stopPropagation(); await axios.delete(`/api/notifications/${id}`); load(); };
 
   const typeIcon = (type) => type === 'proposal_signed'
     ? <CheckCircle size={15} color="#16a34a" />
@@ -64,37 +212,37 @@ function NotificationsPanel({ onClose }) {
   return (
     <div style={{
       position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 4,
-      background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-      border: '1px solid #e5e7eb', zIndex: 1000, maxHeight: 380, display: 'flex', flexDirection: 'column', overflow: 'hidden'
+      background: 'var(--bg-card)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+      border: '1px solid var(--border)', zIndex: 1000, maxHeight: 380, display: 'flex', flexDirection: 'column', overflow: 'hidden'
     }}>
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: '#111' }}>Notifications</span>
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>Notifications</span>
         {data.unread > 0 && (
-          <button onClick={markAllRead} style={{ fontSize: 11, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+          <button onClick={markAllRead} style={{ fontSize: 11, color: 'var(--blue-600)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
             Mark all read
           </button>
         )}
       </div>
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {data.notifications.length === 0 ? (
-          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>No notifications yet</div>
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No notifications yet</div>
         ) : data.notifications.map(n => (
           <div key={n.id}
             onClick={() => markRead(n.id)}
             style={{
-              padding: '10px 14px', borderBottom: '1px solid #f5f5f5', cursor: 'pointer',
-              background: n.read_at ? 'transparent' : '#eff6ff',
+              padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
+              background: n.read_at ? 'transparent' : 'var(--blue-50)',
               display: 'flex', gap: 8, alignItems: 'flex-start'
             }}
           >
             <span style={{ flexShrink: 0, marginTop: 1 }}>{typeIcon(n.type)}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: n.read_at ? 500 : 700, color: '#111', lineHeight: 1.4 }}>{n.title}</div>
-              {n.message && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{n.message}</div>}
-              {n.sales_rep_name && <div style={{ fontSize: 11, color: '#2563eb', marginTop: 2 }}>Rep: {n.sales_rep_name}</div>}
-              <div style={{ fontSize: 10, color: '#aaa', marginTop: 3 }}>{new Date(n.created_at).toLocaleString()}</div>
+              <div style={{ fontSize: 12, fontWeight: n.read_at ? 500 : 700, color: 'var(--text-primary)', lineHeight: 1.4 }}>{n.title}</div>
+              {n.message && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{n.message}</div>}
+              {n.sales_rep_name && <div style={{ fontSize: 11, color: 'var(--blue-600)', marginTop: 2 }}>Rep: {n.sales_rep_name}</div>}
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>{new Date(n.created_at).toLocaleString()}</div>
             </div>
-            <button onClick={(e) => dismiss(n.id, e)} style={{ background: 'none', border: 'none', color: '#bbb', cursor: 'pointer', padding: '0 2px', flexShrink: 0, display: 'flex', alignItems: 'center' }}><X size={14} /></button>
+            <button onClick={(e) => dismiss(n.id, e)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0 2px', flexShrink: 0, display: 'flex', alignItems: 'center' }}><X size={14} /></button>
           </div>
         ))}
       </div>
@@ -102,12 +250,27 @@ function NotificationsPanel({ onClose }) {
   );
 }
 
+// ─── App Layout ───────────────────────────────────────────────────────────────
 function AppLayout() {
   const { token, username, logout, isDemo } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen]   = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [dark, setDark] = useDarkMode();
   const notifsRef = useRef(null);
+
+  // ⌘K / Ctrl+K to open search
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearch(s => !s);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -135,20 +298,26 @@ function AppLayout() {
       {/* ── Mobile top bar ── */}
       <div className="mobile-header">
         <div className="mobile-logo"><Logo size={30} variant="white" subtitle={null} /></div>
-        <button
-          className="mobile-hamburger"
-          onClick={() => setMenuOpen(o => !o)}
-          aria-label="Open menu"
-        >
-          {menuOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button
+            className="mobile-hamburger"
+            onClick={() => setShowSearch(true)}
+            aria-label="Search"
+          >
+            <Search size={20} />
+          </button>
+          <button
+            className="mobile-hamburger"
+            onClick={() => setMenuOpen(o => !o)}
+            aria-label="Open menu"
+          >
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </div>
 
       {/* ── Sidebar backdrop (mobile only) ── */}
-      <div
-        className={`sidebar-backdrop${menuOpen ? ' open' : ''}`}
-        onClick={closeMenu}
-      />
+      <div className={`sidebar-backdrop${menuOpen ? ' open' : ''}`} onClick={closeMenu} />
 
       {/* ── Sidebar ── */}
       <nav className={`sidebar${menuOpen ? ' open' : ''}`}>
@@ -158,6 +327,24 @@ function AppLayout() {
             Linking you to your customers
           </div>
         </div>
+
+        {/* Search button in sidebar */}
+        <div style={{ padding: '8px 8px 0' }}>
+          <button
+            onClick={() => { setShowSearch(true); closeMenu(); }}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,.15)',
+              background: 'rgba(255,255,255,.07)', color: 'rgba(255,255,255,.6)',
+              fontSize: 13, cursor: 'pointer', textAlign: 'left'
+            }}
+          >
+            <Search size={14} />
+            <span style={{ flex: 1 }}>Quick search…</span>
+            <kbd style={{ fontSize: 10, background: 'rgba(255,255,255,.1)', borderRadius: 3, padding: '1px 5px', color: 'rgba(255,255,255,.5)' }}>⌘K</kbd>
+          </button>
+        </div>
+
         <div className="sidebar-nav">
           {NAV.map(({ to, label, Icon, exact }) => (
             <NavLink
@@ -172,6 +359,7 @@ function AppLayout() {
             </NavLink>
           ))}
         </div>
+
         <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
           <a
             href="/portal"
@@ -193,11 +381,24 @@ function AppLayout() {
             Settings
           </NavLink>
         </div>
+
         <div style={{ padding: '8px 12px 4px', borderTop: '1px solid rgba(255,255,255,.08)', position: 'relative' }} ref={notifsRef}>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 6, paddingLeft: 4 }}>
             Signed in as <strong style={{ color: 'rgba(255,255,255,.7)' }}>{username}</strong>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
+            {/* Dark mode toggle */}
+            <button
+              onClick={() => setDark(d => !d)}
+              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              style={{
+                flex: '0 0 auto', padding: '7px 10px', background: 'rgba(255,255,255,.08)',
+                border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, color: 'rgba(255,255,255,.7)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center'
+              }}
+            >
+              {dark ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
             <button
               onClick={() => { setShowNotifs(o => !o); setUnreadCount(0); }}
               style={{
@@ -226,8 +427,9 @@ function AppLayout() {
           </div>
           {showNotifs && <NotificationsPanel onClose={() => setShowNotifs(false)} />}
         </div>
+
         <div style={{ padding: '8px 16px 12px', fontSize: 11, color: 'rgba(255,255,255,.3)' }}>
-          v4.4 • Conduit
+          v5.0 • Conduit
         </div>
       </nav>
 
@@ -250,11 +452,16 @@ function AppLayout() {
           <Route path="/contacts" element={<Contacts />} />
           <Route path="/proposals" element={<Proposals />} />
           <Route path="/proposals/:id" element={<ProposalDetail />} />
+          <Route path="/equipment" element={<Equipment />} />
+          <Route path="/invoices" element={<Invoices />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+
+      {/* ── Global Search overlay ── */}
+      {showSearch && <GlobalSearch onClose={() => setShowSearch(false)} />}
     </div>
   );
 }

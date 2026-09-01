@@ -44,6 +44,9 @@ app.use('/api/notifications', requireAuth, require('./routes/notifications'));
 app.use('/api/users', requireAuth, demoGuard, require('./routes/users'));
 app.use('/api/photos', requireAuth, demoGuard, require('./routes/photos'));
 app.use('/api/import', requireAuth, demoGuard, require('./routes/import'));
+app.use('/api/equipment', requireAuth, demoGuard, require('./routes/equipment'));
+app.use('/api/invoices', requireAuth, demoGuard, require('./routes/invoices'));
+app.use('/api/search', requireAuth, require('./routes/search'));
 app.use('/api/mobile', requireAuth, require('./routes/mobile'));
 
 // Portal admin routes (admin JWT required)

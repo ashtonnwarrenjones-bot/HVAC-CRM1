@@ -330,6 +330,41 @@ const SCHEMA_STATEMENTS = [
     uploaded_by TEXT,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+
+  // Equipment / Asset tracking
+  `CREATE TABLE IF NOT EXISTS equipment (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+    unit_type TEXT,
+    make TEXT,
+    model TEXT,
+    serial_number TEXT,
+    install_date DATE,
+    last_service_date DATE,
+    warranty_expiry DATE,
+    location_notes TEXT,
+    condition TEXT DEFAULT 'good',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // Invoices
+  `CREATE TABLE IF NOT EXISTS invoices (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+    proposal_id INTEGER REFERENCES proposals(id) ON DELETE SET NULL,
+    title TEXT NOT NULL DEFAULT 'Invoice',
+    invoice_number TEXT UNIQUE,
+    amount REAL NOT NULL DEFAULT 0,
+    tax_amount REAL DEFAULT 0,
+    total REAL NOT NULL DEFAULT 0,
+    status TEXT DEFAULT 'unpaid',
+    notes TEXT,
+    due_date DATE,
+    paid_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 
 // ─── Demo data seeder ─────────────────────────────────────────────────────────

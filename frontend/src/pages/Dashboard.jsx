@@ -1,7 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ClipboardList, Building2 } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Building2, TrendingUp, Wrench, DollarSign, Users } from 'lucide-react';
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend
+} from 'recharts';
 
 const CONTRACT_COLORS = {
   maintenance_contract: 'badge-green',
@@ -17,8 +21,6 @@ const PROPOSAL_COLORS = {
   declined: 'badge-red',
 };
 
-const PRIORITY_COLORS = { high: '#ef4444', normal: '#3b82f6', low: '#9ca3af' };
-
 function taskDueLabel(due_date) {
   if (!due_date) return null;
   const today = new Date(); today.setHours(0,0,0,0);
@@ -30,11 +32,39 @@ function taskDueLabel(due_date) {
   return { label: `Due in ${diff}d`, color: '#6b7280', bg: '#f3f4f6' };
 }
 
+// Build last-12-months revenue data from proposals
+function buildRevenueData(proposals) {
+  const months = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      revenue: 0,
+      pipeline: 0,
+    });
+  }
+  proposals.forEach(p => {
+    const d = new Date(p.created_at);
+    const idx = months.findIndex(m => m.year === d.getFullYear() && m.month === d.getMonth());
+    if (idx === -1) return;
+    if (p.status === 'accepted') months[idx].revenue += p.total_amount || 0;
+    else if (['draft', 'sent'].includes(p.status)) months[idx].pipeline += p.total_amount || 0;
+  });
+  return months;
+}
+
+const fmt = (n) => '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmtK = (n) => n >= 1000 ? `$${(n/1000).toFixed(0)}k` : `$${n}`;
+
 export default function Dashboard() {
   const [companies, setCompanies] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newTask, setNewTask] = useState('');
   const [newTaskDue, setNewTaskDue] = useState('');
@@ -46,11 +76,13 @@ export default function Dashboard() {
       axios.get('/api/proposals'),
       axios.get('/api/contacts'),
       axios.get('/api/tasks?completed=0'),
-    ]).then(([c, p, ct, t]) => {
+      axios.get('/api/jobs').catch(() => ({ data: [] })),
+    ]).then(([c, p, ct, t, j]) => {
       setCompanies(c.data);
       setProposals(p.data);
       setContacts(ct.data);
       setTasks(t.data);
+      setJobs(j.data);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -80,9 +112,6 @@ export default function Dashboard() {
     .filter(p => p.status === 'accepted')
     .reduce((s, p) => s + (p.total_amount || 0), 0);
 
-  const fmt = (n) => '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
-  // Sort tasks: overdue first, then due today, then upcoming
   const sortedTasks = [...tasks].sort((a, b) => {
     const da = a.due_date ? new Date(a.due_date + 'T00:00:00') : new Date('9999-12-31');
     const db2 = b.due_date ? new Date(b.due_date + 'T00:00:00') : new Date('9999-12-31');
@@ -96,8 +125,24 @@ export default function Dashboard() {
     return due < today;
   });
 
+  const revenueData = buildRevenueData(proposals);
+
+  // Jobs by status for bar chart
+  const jobStatusData = (() => {
+    const counts = { Scheduled: 0, 'In Progress': 0, Completed: 0, Cancelled: 0 };
+    jobs.forEach(j => {
+      const s = j.status === 'scheduled' ? 'Scheduled'
+        : j.status === 'in_progress' ? 'In Progress'
+        : j.status === 'completed' ? 'Completed'
+        : j.status === 'cancelled' ? 'Cancelled' : null;
+      if (s) counts[s]++;
+    });
+    return Object.entries(counts).map(([name, count]) => ({ name, count }));
+  })();
+
   const recentProposals = [...proposals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 6);
   const recentCompanies = [...companies].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
+  const hasChartData = revenueData.some(d => d.revenue > 0 || d.pipeline > 0);
 
   if (loading) return <div className="page-content"><p className="text-muted">Loading...</p></div>;
 
@@ -112,24 +157,52 @@ export default function Dashboard() {
         {/* Stats */}
         <div className="stats-grid">
           <div className="stat-card">
-            <div className="stat-label">Companies</div>
-            <div className="stat-value" style={{ color: 'var(--blue-700)' }}>{companies.length}</div>
-            <div className="stat-sub">{companies.filter(c => c.contract_type === 'maintenance_contract').length} on contract</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div className="stat-label">Companies</div>
+                <div className="stat-value" style={{ color: 'var(--blue-700)' }}>{companies.length}</div>
+                <div className="stat-sub">{companies.filter(c => c.contract_type === 'maintenance_contract').length} on contract</div>
+              </div>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Building2 size={18} color="#1d4ed8" />
+              </div>
+            </div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Contacts</div>
-            <div className="stat-value" style={{ color: 'var(--gray-700)' }}>{contacts.length}</div>
-            <div className="stat-sub">across all accounts</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div className="stat-label">Contacts</div>
+                <div className="stat-value" style={{ color: 'var(--gray-700)' }}>{contacts.length}</div>
+                <div className="stat-sub">across all accounts</div>
+              </div>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={18} color="#16a34a" />
+              </div>
+            </div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Pipeline Value</div>
-            <div className="stat-value" style={{ color: 'var(--yellow-600)' }}>{fmt(totalPipelineValue)}</div>
-            <div className="stat-sub">{proposals.filter(p => ['draft','sent'].includes(p.status)).length} open proposals</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div className="stat-label">Pipeline Value</div>
+                <div className="stat-value" style={{ color: 'var(--yellow-600)' }}>{fmt(totalPipelineValue)}</div>
+                <div className="stat-sub">{proposals.filter(p => ['draft','sent'].includes(p.status)).length} open proposals</div>
+              </div>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fefce8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <TrendingUp size={18} color="#ca8a04" />
+              </div>
+            </div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Won Revenue</div>
-            <div className="stat-value" style={{ color: 'var(--green-600)' }}>{fmt(totalAccepted)}</div>
-            <div className="stat-sub">{proposals.filter(p => p.status === 'accepted').length} accepted proposals</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div className="stat-label">Won Revenue</div>
+                <div className="stat-value" style={{ color: 'var(--green-600)' }}>{fmt(totalAccepted)}</div>
+                <div className="stat-sub">{proposals.filter(p => p.status === 'accepted').length} accepted proposals</div>
+              </div>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <DollarSign size={18} color="#16a34a" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -142,6 +215,89 @@ export default function Dashboard() {
             </span>
           </div>
         )}
+
+        {/* ── Charts Row ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          {/* Revenue Trend */}
+          <div className="card">
+            <div className="card-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 7 }}><TrendingUp size={15} /> Revenue Trend (12 months)</h3>
+            </div>
+            <div style={{ padding: '16px 8px 8px' }}>
+              {hasChartData ? (
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart data={revenueData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#16a34a" stopOpacity={0.15}/>
+                        <stop offset="95%" stopColor="#16a34a" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorPipeline" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.12}/>
+                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} />
+                    <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                    <Tooltip formatter={(v, n) => [fmt(v), n === 'revenue' ? 'Won Revenue' : 'Pipeline']} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 12 }} />
+                    <Area type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={2} fill="url(#colorRevenue)" name="revenue" />
+                    <Area type="monotone" dataKey="pipeline" stroke="#2563eb" strokeWidth={2} fill="url(#colorPipeline)" name="pipeline" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 13, flexDirection: 'column', gap: 8 }}>
+                  <TrendingUp size={28} color="#d1d5db" />
+                  <span>Chart will populate as you create proposals</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 16, padding: '4px 16px 4px', justifyContent: 'center' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6b7280' }}>
+                  <span style={{ width: 10, height: 3, background: '#16a34a', borderRadius: 2, display: 'inline-block' }}/>Won Revenue
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6b7280' }}>
+                  <span style={{ width: 10, height: 3, background: '#2563eb', borderRadius: 2, display: 'inline-block' }}/>Pipeline
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Jobs by Status */}
+          <div className="card">
+            <div className="card-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Wrench size={15} /> Jobs by Status</h3>
+              <Link to="/schedule" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'none' }}>View Schedule →</Link>
+            </div>
+            <div style={{ padding: '16px 8px 8px' }}>
+              {jobs.length > 0 ? (
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={jobStatusData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="count" name="Jobs" radius={[4, 4, 0, 0]}
+                      fill="#2563eb"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 13, flexDirection: 'column', gap: 8 }}>
+                  <Wrench size={28} color="#d1d5db" />
+                  <span>Chart will populate as you schedule jobs</span>
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, padding: '8px 8px 0' }}>
+                {jobStatusData.map(({ name, count }) => (
+                  <div key={name} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: name === 'Completed' ? '#16a34a' : name === 'In Progress' ? '#d97706' : name === 'Cancelled' ? '#ef4444' : '#2563eb' }}>{count}</div>
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>{name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div className="two-col">
           {/* Recent Proposals */}
@@ -183,7 +339,6 @@ export default function Dashboard() {
               <span style={{ fontSize: 12, color: '#6b7280' }}>{tasks.length} open</span>
             </div>
             <div className="card-body" style={{ paddingBottom: 0 }}>
-              {/* Quick add */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                 <input
                   type="text"
@@ -207,8 +362,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Task list */}
-            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
               {sortedTasks.length === 0 ? (
                 <div style={{ padding: '20px 20px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
                   No open tasks — you're all caught up! 🎉
@@ -243,11 +397,6 @@ export default function Dashboard() {
                   </div>
                 );
               })}
-              {sortedTasks.length > 12 && (
-                <div style={{ padding: '10px 20px', textAlign: 'center', fontSize: 12, color: '#6b7280' }}>
-                  +{sortedTasks.length - 12} more tasks — add them from company pages
-                </div>
-              )}
             </div>
           </div>
         </div>
