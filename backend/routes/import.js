@@ -108,20 +108,24 @@ router.post(
 
       if (req.files?.accounts?.[0]) {
         const rows = parseCSV(req.files.accounts[0].buffer);
-        result.accounts = rows.map(mapAccount).filter(a => a.name).map(a => {
-          const existing = await db.prepare('SELECT id FROM companies WHERE LOWER(name) = LOWER(?)').get(a.name);
-          return { ...a, _exists: !!existing };
-        });
+        result.accounts = await Promise.all(
+          rows.map(mapAccount).filter(a => a.name).map(async a => {
+            const existing = await db.prepare('SELECT id FROM companies WHERE LOWER(name) = LOWER(?)').get(a.name);
+            return { ...a, _exists: !!existing };
+          })
+        );
       }
 
       if (req.files?.contacts?.[0]) {
         const rows = parseCSV(req.files.contacts[0].buffer);
-        result.contacts = rows.map(mapContact).filter(c => c.last_name || c.first_name).map(c => {
-          const exists = c.email
-            ? !!await db.prepare('SELECT id FROM contacts WHERE LOWER(email) = LOWER(?)').get(c.email)
-            : false;
-          return { ...c, _exists: exists };
-        });
+        result.contacts = await Promise.all(
+          rows.map(mapContact).filter(c => c.last_name || c.first_name).map(async c => {
+            const exists = c.email
+              ? !!(await db.prepare('SELECT id FROM contacts WHERE LOWER(email) = LOWER(?)').get(c.email))
+              : false;
+            return { ...c, _exists: exists };
+          })
+        );
       }
 
       res.json(result);
@@ -151,8 +155,8 @@ router.post(
 
       // Pre-load company map (name.lower → id) so contacts can link to newly-created companies
       const companyMap = {};
-      await db.prepare('SELECT id, LOWER(name) AS key FROM companies').all()
-        .forEach(c => { companyMap[c.key] = c.id; });
+      const existingCompanies = await db.prepare('SELECT id, LOWER(name) AS key FROM companies').all();
+      existingCompanies.forEach(c => { companyMap[c.key] = c.id; });
 
       // ── Import Accounts ──────────────────────────────────────────────────
       if (req.files?.accounts?.[0]) {
