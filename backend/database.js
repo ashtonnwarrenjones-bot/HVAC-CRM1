@@ -404,7 +404,7 @@ async function seedDemoData(force = false) {
 
   if (force) {
     const tables = ['tasks','activities','deals','jobs','proposal_line_items',
-      'proposals','contacts','companies'];
+      'proposals','contacts','companies','invoices','memberships','equipment','pricebook_items'];
     for (const t of tables) {
       await pool.query(`DELETE FROM ${t}`);
     }
@@ -422,19 +422,19 @@ async function seedDemoData(force = false) {
 
   // ── Companies ──────────────────────────────────────────────────────────────
   const companiesData = [
-    { name:'Apex Tower Management', address:'742 Michigan Ave', city:'Chicago', state:'IL', zip:'60611', phone:'(312) 555-0142', website:'apextower.com', property_type:'commercial', contract_type:'active', num_hvac_units:24, annual_revenue:2800000, notes:'Premium high-rise property. 32-floor office tower. Annual maintenance contract since 2019.' },
-    { name:'Summit Health Partners', address:'2100 Wellness Way', city:'Denver', state:'CO', zip:'80204', phone:'(720) 555-0298', website:'summithealthpartners.org', property_type:'commercial', contract_type:'active', num_hvac_units:18, annual_revenue:890000, notes:'Medical facility — HVAC uptime is critical. 24/7 response required per contract.' },
-    { name:'Metro Restaurant Group', address:'510 Broadway', city:'Denver', state:'CO', zip:'80203', phone:'(303) 555-0371', website:'metrorestaurantgroup.com', property_type:'commercial', contract_type:'prospect', num_hvac_units:8, annual_revenue:420000, notes:'4 restaurant locations in downtown Denver. Kitchen exhaust systems are primary need.' },
-    { name:'Ridgeline Office Park', address:'3500 Arapahoe Ave', city:'Boulder', state:'CO', zip:'80303', phone:'(303) 555-0519', website:'ridgelineofficepark.com', property_type:'commercial', contract_type:'active', num_hvac_units:12, annual_revenue:640000, notes:'Multi-tenant office park, 6 buildings. Phase 2 expansion underway.' },
-    { name:'Greenfield School District', address:'1200 School Road', city:'Lakewood', state:'CO', zip:'80226', phone:'(303) 555-0684', website:'greenfieldschools.org', property_type:'commercial', contract_type:'prospect', num_hvac_units:30, annual_revenue:0, notes:'K-12 district with 5 campuses. HVAC infrastructure aging — upgrade RFP expected Q2.' },
+    { name:'Apex Tower Management', address:'742 Michigan Ave', city:'Chicago', state:'IL', zip:'60611', phone:'(312) 555-0142', website:'apextower.com', property_type:'commercial', contract_type:'active', num_hvac_units:24, annual_revenue:2800000, lead_source:'Referral', notes:'Premium high-rise property. 32-floor office tower. Annual maintenance contract since 2019.' },
+    { name:'Summit Health Partners', address:'2100 Wellness Way', city:'Denver', state:'CO', zip:'80204', phone:'(720) 555-0298', website:'summithealthpartners.org', property_type:'commercial', contract_type:'active', num_hvac_units:18, annual_revenue:890000, lead_source:'Google Search', notes:'Medical facility — HVAC uptime is critical. 24/7 response required per contract.' },
+    { name:'Metro Restaurant Group', address:'510 Broadway', city:'Denver', state:'CO', zip:'80203', phone:'(303) 555-0371', website:'metrorestaurantgroup.com', property_type:'commercial', contract_type:'prospect', num_hvac_units:8, annual_revenue:420000, lead_source:'Cold Outreach', notes:'4 restaurant locations in downtown Denver. Kitchen exhaust systems are primary need.' },
+    { name:'Ridgeline Office Park', address:'3500 Arapahoe Ave', city:'Boulder', state:'CO', zip:'80303', phone:'(303) 555-0519', website:'ridgelineofficepark.com', property_type:'commercial', contract_type:'active', num_hvac_units:12, annual_revenue:640000, lead_source:'Referral', notes:'Multi-tenant office park, 6 buildings. Phase 2 expansion underway.' },
+    { name:'Greenfield School District', address:'1200 School Road', city:'Lakewood', state:'CO', zip:'80226', phone:'(303) 555-0684', website:'greenfieldschools.org', property_type:'commercial', contract_type:'prospect', num_hvac_units:30, annual_revenue:0, lead_source:'Trade Show', notes:'K-12 district with 5 campuses. HVAC infrastructure aging — upgrade RFP expected Q2.' },
   ];
 
   const compIds = [];
   for (const c of companiesData) {
     const r = await pool.query(
-      `INSERT INTO companies (name,address,city,state,zip,phone,website,property_type,contract_type,num_hvac_units,annual_revenue,notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
-      [c.name,c.address,c.city,c.state,c.zip,c.phone,c.website,c.property_type,c.contract_type,c.num_hvac_units||0,c.annual_revenue||0,c.notes]
+      `INSERT INTO companies (name,address,city,state,zip,phone,website,property_type,contract_type,num_hvac_units,annual_revenue,lead_source,notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+      [c.name,c.address,c.city,c.state,c.zip,c.phone,c.website,c.property_type,c.contract_type,c.num_hvac_units||0,c.annual_revenue||0,c.lead_source||null,c.notes]
     );
     compIds.push(r.rows[0].id);
   }
@@ -507,22 +507,37 @@ async function seedDemoData(force = false) {
   }
 
   // ── Jobs ──────────────────────────────────────────────────────────────────
+  const today = new Date().toISOString().split('T')[0];
   const jobsData = [
-    { company_id:apexId,   contact_id:primaryContact[apexId],   title:'Q1 Preventive Maintenance — Floors 1-16',      job_type:'maintenance', technician:'Marcus Johnson', status:'completed',  scheduled_date:dateStr(30), scheduled_time:'08:00', duration_hours:8, notes:'All 12 units on floors 1-16 serviced. Filters replaced. Coils cleaned.' },
-    { company_id:summitId, contact_id:primaryContact[summitId], title:'Emergency A/C Repair — ICU Wing',               job_type:'repair',       technician:'Tyler Brooks',   status:'completed',  scheduled_date:dateStr(22), scheduled_time:'14:00', duration_hours:4, notes:'Compressor failure on RTU-6. Replaced capacitor and contractor. Unit restored.' },
-    { company_id:ridgeId,  contact_id:primaryContact[ridgeId],  title:'Filter Change & Inspection — Buildings 1-3',    job_type:'maintenance', technician:'Marcus Johnson', status:'scheduled',  scheduled_date:dateStr(-7), scheduled_time:'07:30', duration_hours:6, notes:'Monthly filter replacement and belt inspection.' },
-    { company_id:metroId,  contact_id:primaryContact[metroId],  title:'Kitchen Exhaust Cleaning — Broadway Location',  job_type:'cleaning',    technician:'Sandra Lee',     status:'scheduled',  scheduled_date:dateStr(-14),scheduled_time:'22:00', duration_hours:3, notes:'After-hours cleaning per fire code requirements.' },
-    { company_id:summitId, contact_id:primaryContact[summitId], title:'Pre-Season Boiler Inspection — Mechanical Rm B',job_type:'inspection',  technician:'Tyler Brooks',   status:'in_progress',scheduled_date:dateStr(-3), scheduled_time:'09:00', duration_hours:5, notes:'Annual boiler inspection before heating season.' },
+    // Past completed jobs (for analytics/invoicing)
+    { company_id:apexId,   contact_id:primaryContact[apexId],   title:'Q1 Preventive Maintenance — Floors 1-16',      job_type:'maintenance', technician:'Marcus Johnson', status:'completed',  scheduled_date:dateStr(60), scheduled_time:'08:00', duration_hours:8, notes:'All 12 units on floors 1-16 serviced. Filters replaced. Coils cleaned.' },
+    { company_id:summitId, contact_id:primaryContact[summitId], title:'Emergency A/C Repair — ICU Wing',               job_type:'repair',       technician:'Tyler Brooks',   status:'completed',  scheduled_date:dateStr(45), scheduled_time:'14:00', duration_hours:4, notes:'Compressor failure on RTU-6. Replaced capacitor and contractor. Unit restored.' },
+    { company_id:ridgeId,  contact_id:primaryContact[ridgeId],  title:'Filter Change & Inspection — Buildings 1-3',    job_type:'maintenance', technician:'Marcus Johnson', status:'completed',  scheduled_date:dateStr(30), scheduled_time:'07:30', duration_hours:6, notes:'Monthly filter replacement and belt inspection.' },
+    { company_id:apexId,   contact_id:primaryContact[apexId],   title:'Refrigerant Leak Repair — Floors 18-24',        job_type:'repair',       technician:'Sandra Lee',     status:'completed',  scheduled_date:dateStr(22), scheduled_time:'13:00', duration_hours:4, notes:'Located and repaired two pinhole leaks. Recharged with 12 lbs R-410A.' },
+    { company_id:summitId, contact_id:primaryContact[summitId], title:'Quarterly PM — West Wing RTUs',                 job_type:'maintenance', technician:'Tyler Brooks',   status:'completed',  scheduled_date:dateStr(15), scheduled_time:'08:00', duration_hours:6, notes:'Seasonal tune-up complete. All units within spec.' },
+    { company_id:ridgeId,  contact_id:primaryContact[ridgeId],  title:'Annual Coil Cleaning — All Buildings',          job_type:'maintenance', technician:'Marcus Johnson', status:'completed',  scheduled_date:dateStr(10), scheduled_time:'07:00', duration_hours:8, notes:'Evaporator and condenser coils cleaned across all 6 buildings.' },
+    // Today's jobs (for Dispatch Board)
+    { company_id:apexId,   contact_id:primaryContact[apexId],   title:'Q2 PM — Floors 17-32',                          job_type:'maintenance', technician:'Marcus Johnson', status:'in_progress', scheduled_date:today, scheduled_time:'07:00', duration_hours:8,  notes:'Continuing quarterly PM for upper floors.' },
+    { company_id:summitId, contact_id:primaryContact[summitId], title:'Chiller Pre-Install Site Survey',                job_type:'inspection',  technician:'Tyler Brooks',   status:'scheduled',   scheduled_date:today, scheduled_time:'09:00', duration_hours:3,  notes:'Verify crane access and mechanical room clearances before unit delivery.' },
+    { company_id:metroId,  contact_id:primaryContact[metroId],  title:'Kitchen Exhaust Inspection — Broadway',          job_type:'inspection',  technician:'Sandra Lee',     status:'scheduled',   scheduled_date:today, scheduled_time:'10:30', duration_hours:2,  notes:'Pre-cleaning inspection per fire marshal requirement.' },
+    { company_id:ridgeId,  contact_id:primaryContact[ridgeId],  title:'Emergency Repair — Building 4 HVAC Down',        job_type:'repair',      technician:'Marcus Johnson', status:'scheduled',   scheduled_date:today, scheduled_time:'13:00', duration_hours:3,  notes:'Tenant complaint — no cooling on 2nd floor. Suspected compressor issue.' },
+    { company_id:greenId,  contact_id:primaryContact[greenId],  title:'Annual Inspection — Greenfield High School',     job_type:'inspection',  technician:'Tyler Brooks',   status:'scheduled',   scheduled_date:today, scheduled_time:'14:00', duration_hours:4,  notes:'Full campus inspection before fall semester.' },
+    // Upcoming jobs
+    { company_id:metroId,  contact_id:primaryContact[metroId],  title:'Kitchen Exhaust Cleaning — Broadway Location',  job_type:'cleaning',    technician:'Sandra Lee',     status:'scheduled',  scheduled_date:dateStr(-7), scheduled_time:'22:00', duration_hours:3, notes:'After-hours cleaning per fire code requirements.' },
+    { company_id:summitId, contact_id:primaryContact[summitId], title:'Pre-Season Boiler Inspection — Mechanical Rm B',job_type:'inspection',  technician:'Tyler Brooks',   status:'scheduled',  scheduled_date:dateStr(-14),scheduled_time:'09:00', duration_hours:5, notes:'Annual boiler inspection before heating season.' },
     { company_id:greenId,  contact_id:primaryContact[greenId],  title:'Annual HVAC Inspection — Greenfield Middle School',job_type:'inspection',technician:'Marcus Johnson',status:'scheduled',  scheduled_date:dateStr(-21),scheduled_time:'08:00', duration_hours:10,notes:'Full campus inspection. 8 rooftop units + cafeteria system.' },
   ];
 
+  const jobIds = [];
   for (const j of jobsData) {
-    await pool.query(
+    const r = await pool.query(
       `INSERT INTO jobs (company_id,contact_id,title,job_type,technician,status,scheduled_date,scheduled_time,duration_hours,notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
       [j.company_id,j.contact_id,j.title,j.job_type,j.technician,j.status,j.scheduled_date,j.scheduled_time,j.duration_hours,j.notes]
     );
+    jobIds.push({ id: r.rows[0].id, ...j });
   }
+  const completedJobs = jobIds.filter(j => j.status === 'completed');
 
   // ── Deals ─────────────────────────────────────────────────────────────────
   const dealsData = [
@@ -571,6 +586,123 @@ async function seedDemoData(force = false) {
     await pool.query(
       'INSERT INTO tasks (company_id,title,due_date,priority) VALUES ($1,$2,$3,$4)',
       [t.company_id,t.title,t.due_date,t.priority]
+    );
+  }
+
+  // ── Pricebook / Service Catalog ───────────────────────────────────────────
+  const pricebookData = [
+    // Maintenance
+    { category:'Maintenance', name:'AC Tune-Up (Single Unit)', description:'Filter check, coil inspection, refrigerant level check, electrical connections', unit_price:189, cost:45, unit:'visit' },
+    { category:'Maintenance', name:'Quarterly PM Visit', description:'Full preventive maintenance visit including filters, belts, coils, controls', unit_price:385, cost:90, unit:'visit' },
+    { category:'Maintenance', name:'Annual PM Contract (per unit)', description:'4 quarterly visits, priority scheduling, 10% parts discount', unit_price:950, cost:220, unit:'unit/year' },
+    { category:'Maintenance', name:'Filter Replacement — MERV-8', description:'Standard commercial filter replacement', unit_price:28, cost:8, unit:'each' },
+    { category:'Maintenance', name:'Filter Replacement — MERV-13', description:'High-efficiency commercial filter replacement', unit_price:65, cost:18, unit:'each' },
+    { category:'Maintenance', name:'Coil Cleaning (Evaporator)', description:'Chemical cleaning of evaporator coil', unit_price:245, cost:55, unit:'unit' },
+    { category:'Maintenance', name:'Coil Cleaning (Condenser)', description:'Chemical cleaning of condenser coil', unit_price:195, cost:45, unit:'unit' },
+    // Repairs
+    { category:'Repairs', name:'Diagnostic / Service Call', description:'On-site diagnostic, first hour of labor included', unit_price:145, cost:65, unit:'visit' },
+    { category:'Repairs', name:'Labor — Standard Hours', description:'Technician labor rate, Mon–Fri 7am–5pm', unit_price:125, cost:55, unit:'hour' },
+    { category:'Repairs', name:'Labor — After Hours / Emergency', description:'Technician labor rate, evenings, weekends, holidays', unit_price:195, cost:75, unit:'hour' },
+    { category:'Repairs', name:'Capacitor Replacement', description:'Run or start capacitor supply and install', unit_price:285, cost:35, unit:'each' },
+    { category:'Repairs', name:'Contactor Replacement', description:'Contactor supply and install', unit_price:245, cost:40, unit:'each' },
+    { category:'Repairs', name:'Refrigerant — R-410A', description:'Refrigerant top-off or recharge, per pound', unit_price:95, cost:28, unit:'lb' },
+    { category:'Repairs', name:'Refrigerant — R-22 (legacy)', description:'Legacy refrigerant, per pound', unit_price:185, cost:65, unit:'lb' },
+    { category:'Repairs', name:'Blower Motor Replacement', description:'PSC or ECM motor supply and install', unit_price:685, cost:195, unit:'each' },
+    { category:'Repairs', name:'Compressor Replacement', description:'Scroll compressor swap, includes labor and refrigerant charge', unit_price:1850, cost:650, unit:'each' },
+    // Installations
+    { category:'Installation', name:'Split System (2–3 ton)', description:'Supply and install split AC/heat pump system, residential or light commercial', unit_price:4200, cost:1800, unit:'system' },
+    { category:'Installation', name:'RTU Replacement (3–5 ton)', description:'Packaged rooftop unit removal and replacement', unit_price:8500, cost:3800, unit:'unit' },
+    { category:'Installation', name:'RTU Replacement (7.5–10 ton)', description:'Large packaged rooftop unit removal and replacement', unit_price:14500, cost:6200, unit:'unit' },
+    { category:'Installation', name:'Ductwork — Per Linear Foot', description:'Sheet metal duct fabrication and installation', unit_price:32, cost:12, unit:'lin ft' },
+    // Cleaning
+    { category:'Cleaning', name:'Kitchen Hood Cleaning', description:'Commercial kitchen exhaust hood and duct cleaning per NFPA 96', unit_price:650, cost:175, unit:'hood' },
+    { category:'Cleaning', name:'Duct Cleaning (per vent)', description:'Supply and return air duct cleaning', unit_price:45, cost:12, unit:'vent' },
+    { category:'Cleaning', name:'Drain Line Flush', description:'Condensate drain line clearing and treatment', unit_price:95, cost:15, unit:'each' },
+    // Inspections
+    { category:'Inspection', name:'Energy Audit', description:'Comprehensive HVAC energy assessment with written report', unit_price:495, cost:120, unit:'visit' },
+    { category:'Inspection', name:'IAQ Assessment', description:'Indoor air quality test — CO2, humidity, particulates', unit_price:325, cost:85, unit:'visit' },
+  ];
+
+  for (const item of pricebookData) {
+    await pool.query(
+      `INSERT INTO pricebook_items (category, name, description, unit_price, unit, cost, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,TRUE)`,
+      [item.category, item.name, item.description, item.unit_price, item.unit, item.cost]
+    );
+  }
+
+  // ── Equipment ─────────────────────────────────────────────────────────────
+  const equipmentData = [
+    { company_id:apexId,   unit_type:'RTU',   make:'Carrier',  model:'48XC048-5', serial_number:'CAR-2019-0042', install_date:dateStr(365*5), last_service_date:dateStr(30), warranty_expiry:dateStr(-365), condition:'good', location_notes:'Rooftop — Zone A (Floors 1-8)' },
+    { company_id:apexId,   unit_type:'RTU',   make:'Carrier',  model:'48XC060-5', serial_number:'CAR-2019-0043', install_date:dateStr(365*5), last_service_date:dateStr(30), warranty_expiry:dateStr(-365), condition:'fair', location_notes:'Rooftop — Zone B (Floors 9-16)' },
+    { company_id:apexId,   unit_type:'AHU',   make:'Trane',    model:'CSAA120A',  serial_number:'TRN-2021-1187', install_date:dateStr(365*3), last_service_date:dateStr(60), warranty_expiry:dateStr(365*2), condition:'good', location_notes:'Mechanical Room — Basement Level 2' },
+    { company_id:summitId, unit_type:'Chiller',make:'Carrier', model:'30XA-200',  serial_number:'CHR-2018-0088', install_date:dateStr(365*6), last_service_date:dateStr(22), warranty_expiry:dateStr(-730), condition:'poor', location_notes:'Rooftop — Main Plant' },
+    { company_id:summitId, unit_type:'Boiler', make:'Cleaver Brooks', model:'CB-200', serial_number:'CLB-2020-0112', install_date:dateStr(365*4), last_service_date:dateStr(15), warranty_expiry:dateStr(365), condition:'good', location_notes:'Mechanical Room B — Ground Floor' },
+    { company_id:ridgeId,  unit_type:'Split',  make:'Daikin',   model:'RZR024MVJU', serial_number:'DAK-2022-0334', install_date:dateStr(365*2), last_service_date:dateStr(10), warranty_expiry:dateStr(365*3), condition:'good', location_notes:'Building 2 — Server Room' },
+    { company_id:ridgeId,  unit_type:'RTU',    make:'Lennox',   model:'LGH060H4E',  serial_number:'LNX-2020-0089', install_date:dateStr(365*4), last_service_date:dateStr(30), warranty_expiry:dateStr(-30), condition:'fair', location_notes:'Building 4 — Rooftop' },
+    { company_id:greenId,  unit_type:'RTU',    make:'York',     model:'ZR060NFFP',  serial_number:'YRK-2017-0021', install_date:dateStr(365*7), last_service_date:dateStr(45), warranty_expiry:dateStr(-730), condition:'poor', location_notes:'High School — North Roof' },
+  ];
+
+  for (const eq of equipmentData) {
+    await pool.query(
+      `INSERT INTO equipment (company_id, unit_type, make, model, serial_number, install_date, last_service_date, warranty_expiry, condition, location_notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [eq.company_id, eq.unit_type, eq.make, eq.model, eq.serial_number, eq.install_date, eq.last_service_date, eq.warranty_expiry, eq.condition, eq.location_notes]
+    );
+  }
+
+  // ── Memberships / Maintenance Plans ───────────────────────────────────────
+  const membershipData = [
+    { company_id:apexId,   contact_id:primaryContact[apexId],   plan_name:'Comfort Club — Premium',  plan_type:'annual',   price:2400, status:'active',    start_date:dateStr(365), next_service_date:dateStr(-60), notes:'Includes 4 PM visits, priority emergency response, 15% parts discount.' },
+    { company_id:summitId, contact_id:primaryContact[summitId], plan_name:'Comfort Club — Premium',  plan_type:'annual',   price:2400, status:'active',    start_date:dateStr(270), next_service_date:dateStr(-30), notes:'Medical facility SLA — 2hr emergency response guarantee.' },
+    { company_id:ridgeId,  contact_id:primaryContact[ridgeId],  plan_name:'Comfort Club — Standard', plan_type:'annual',   price:1200, status:'active',    start_date:dateStr(180), next_service_date:dateStr(-90), notes:'Covers all 6 buildings in Phase 1 & 2.' },
+    { company_id:metroId,  contact_id:primaryContact[metroId],  plan_name:'Comfort Club — Standard', plan_type:'monthly',  price:150,  status:'active',    start_date:dateStr(90),  next_service_date:dateStr(-45), notes:'Restaurant group — kitchen exhaust focus.' },
+    { company_id:greenId,  contact_id:primaryContact[greenId],  plan_name:'Comfort Club — Basic',    plan_type:'annual',   price:800,  status:'paused',    start_date:dateStr(400), next_service_date:dateStr(-120),notes:'On hold pending school board budget approval for renewal.' },
+  ];
+
+  for (const m of membershipData) {
+    await pool.query(
+      `INSERT INTO memberships (company_id, contact_id, plan_name, plan_type, price, status, start_date, next_service_date, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [m.company_id, m.contact_id, m.plan_name, m.plan_type, m.price, m.status, m.start_date, m.next_service_date, m.notes]
+    );
+  }
+
+  // ── Invoices ──────────────────────────────────────────────────────────────
+  const invoiceAmounts = [
+    { job: completedJobs[0], amount: 3800, tax: 228,   status: 'paid',   days_ago: 55, due_offset: 30 },
+    { job: completedJobs[1], amount: 1450, tax: 87,    status: 'paid',   days_ago: 40, due_offset: 30 },
+    { job: completedJobs[2], amount: 2310, tax: 138.6, status: 'paid',   days_ago: 25, due_offset: 30 },
+    { job: completedJobs[3], amount: 1100, tax: 66,    status: 'paid',   days_ago: 17, due_offset: 30 },
+    { job: completedJobs[4], amount: 2310, tax: 138.6, status: 'unpaid', days_ago: 10, due_offset: 30 },
+    { job: completedJobs[5], amount: 3080, tax: 184.8, status: 'unpaid', days_ago: 5,  due_offset: 30 },
+  ];
+
+  for (let i = 0; i < invoiceAmounts.length; i++) {
+    const inv = invoiceAmounts[i];
+    if (!inv.job) continue;
+    const total = inv.amount + inv.tax;
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() - inv.days_ago + inv.due_offset);
+    const createdAt = new Date();
+    createdAt.setDate(createdAt.getDate() - inv.days_ago);
+    const paidAt = inv.status === 'paid' ? new Date(createdAt.getTime() + 7*86400000).toISOString() : null;
+    await pool.query(
+      `INSERT INTO invoices (company_id, job_id, invoice_number, title, amount, tax_amount, total, status, due_date, paid_at, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        inv.job.company_id,
+        inv.job.id,
+        `INV-${String(1000 + i + 1).padStart(4,'0')}`,
+        inv.job.title,
+        inv.amount,
+        inv.tax,
+        total,
+        inv.status,
+        dueDate.toISOString().slice(0, 10),
+        paidAt,
+        createdAt.toISOString(),
+      ]
     );
   }
 
