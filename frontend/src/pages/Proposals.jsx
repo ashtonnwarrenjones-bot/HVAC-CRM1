@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { BookOpen, Search, Plus, X, Tag } from 'lucide-react';
 
 const STATUS_COLORS = {
   draft: 'badge-gray', sent: 'badge-blue', accepted: 'badge-green', declined: 'badge-red',
@@ -18,11 +19,177 @@ const EMPTY_FORM = {
 
 const EMPTY_ITEM = { description: '', quantity: '1', unit: 'ea', unit_price: '0' };
 
+// ─── Pricebook Picker ─────────────────────────────────────────────────────────
+function PricebookPicker({ onAdd, onClose }) {
+  const [items, setItems] = useState([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [added, setAdded] = useState({});          // track which item ids were just added
+
+  useEffect(() => {
+    axios.get('/api/pricebook', { params: { is_active: true } })
+      .then(r => setItems(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = items.filter(i => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return [i.name, i.category, i.description].some(v => v && v.toLowerCase().includes(q));
+  });
+
+  // group by category
+  const grouped = filtered.reduce((acc, item) => {
+    const cat = item.category || 'Uncategorized';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(item);
+    return acc;
+  }, {});
+
+  const handleAdd = (item) => {
+    onAdd({
+      description: item.name + (item.description ? ` — ${item.description}` : ''),
+      quantity: '1',
+      unit: item.unit || 'ea',
+      unit_price: String(item.unit_price || 0),
+    });
+    setAdded(prev => ({ ...prev, [item.id]: true }));
+    // reset checkmark after 1.5s
+    setTimeout(() => setAdded(prev => { const n = { ...prev }; delete n[item.id]; return n; }), 1500);
+  };
+
+  const fmtPrice = (n) => n != null ? '$' + parseFloat(n).toFixed(2) : '—';
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1100,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.5)',
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: 'var(--bg-card)', borderRadius: 12, width: '92vw', maxWidth: 700,
+        maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+        border: '1px solid var(--border)',
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px', borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <BookOpen size={18} color="var(--blue-600)" />
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', flex: 1 }}>
+            Browse Pricebook
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)' }} />
+            <input
+              autoFocus
+              className="form-control"
+              style={{ paddingLeft: 32 }}
+              placeholder="Search services…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 6 }}>
+            Click any service to add it as a line item. You can add multiple.
+          </div>
+        </div>
+
+        {/* Items */}
+        <div style={{ overflowY: 'auto', flex: 1, padding: '12px 20px 20px' }}>
+          {loading ? (
+            <p style={{ color: 'var(--gray-400)', textAlign: 'center', padding: 24 }}>Loading pricebook…</p>
+          ) : filtered.length === 0 ? (
+            <p style={{ color: 'var(--gray-400)', textAlign: 'center', padding: 24 }}>
+              {search ? 'No services match your search.' : 'No active services in pricebook.'}
+            </p>
+          ) : (
+            Object.entries(grouped).map(([cat, catItems]) => (
+              <div key={cat} style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+                  <Tag size={12} color="var(--blue-600)" />
+                  <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{cat}</span>
+                  <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>({catItems.length})</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {catItems.map(item => {
+                    const wasAdded = added[item.id];
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => handleAdd(item)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                          border: `1px solid ${wasAdded ? 'var(--green-500)' : 'var(--border)'}`,
+                          background: wasAdded ? 'var(--green-50, #f0fdf4)' : 'var(--bg-page)',
+                          transition: 'all .15s',
+                        }}
+                        onMouseEnter={e => { if (!wasAdded) e.currentTarget.style.background = 'var(--gray-50)'; e.currentTarget.style.borderColor = 'var(--blue-300)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = wasAdded ? 'var(--green-50, #f0fdf4)' : 'var(--bg-page)'; e.currentTarget.style.borderColor = wasAdded ? 'var(--green-500)' : 'var(--border)'; }}
+                      >
+                        {/* Add / check icon */}
+                        <div style={{
+                          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: wasAdded ? 'var(--green-500)' : 'var(--blue-100)',
+                          color: wasAdded ? 'white' : 'var(--blue-600)',
+                          fontSize: 14, fontWeight: 700, transition: 'all .2s',
+                        }}>
+                          {wasAdded ? '✓' : <Plus size={14} />}
+                        </div>
+
+                        {/* Name + description */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{item.name}</div>
+                          {item.description && (
+                            <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
+                          )}
+                        </div>
+
+                        {/* Price + unit */}
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--green-700)' }}>{fmtPrice(item.unit_price)}</div>
+                          <div style={{ fontSize: 11, color: 'var(--gray-400)' }}>per {item.unit || 'ea'}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '12px 20px', borderTop: '1px solid var(--border)',
+          display: 'flex', justifyContent: 'flex-end',
+        }}>
+          <button className="btn btn-primary" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Proposals Page ──────────────────────────────────────────────────────
 export default function Proposals() {
   const [proposals, setProposals] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showPricebook, setShowPricebook] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [lineItems, setLineItems] = useState([{ ...EMPTY_ITEM }]);
@@ -94,6 +261,21 @@ export default function Proposals() {
   };
   const addItem = () => setLineItems(p => [...p, { ...EMPTY_ITEM }]);
   const removeItem = (idx) => setLineItems(p => p.filter((_, i) => i !== idx));
+
+  // Add a pricebook item as a line item
+  const addPricebookItem = (item) => {
+    // If last line is empty, replace it; otherwise append
+    setLineItems(prev => {
+      const last = prev[prev.length - 1];
+      const lastEmpty = !last.description && !parseFloat(last.unit_price);
+      if (lastEmpty) {
+        const updated = [...prev];
+        updated[updated.length - 1] = item;
+        return updated;
+      }
+      return [...prev, item];
+    });
+  };
 
   const subtotal = lineItems.reduce((s, i) => s + ((parseFloat(i.quantity) || 0) * (parseFloat(i.unit_price) || 0)), 0);
   const taxAmt = subtotal * ((parseFloat(form.tax_rate) || 0) / 100);
@@ -255,7 +437,15 @@ export default function Proposals() {
         </div>
       </div>
 
-      {/* New Proposal Modal */}
+      {/* Pricebook picker (rendered on top of proposal modal) */}
+      {showPricebook && (
+        <PricebookPicker
+          onAdd={addPricebookItem}
+          onClose={() => setShowPricebook(false)}
+        />
+      )}
+
+      {/* New / Edit Proposal Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal modal-lg" style={{ maxWidth: 900 }}>
@@ -308,7 +498,19 @@ export default function Proposals() {
               </div>
 
               {/* Excel Upload */}
-              <div className="section-title mt-4">Line Items</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 8 }}>
+                <div className="section-title" style={{ margin: 0 }}>Line Items</div>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--blue-600)', borderColor: 'var(--blue-300)' }}
+                  onClick={() => setShowPricebook(true)}
+                  type="button"
+                >
+                  <BookOpen size={14} />
+                  Browse Pricebook
+                </button>
+              </div>
+
               <div
                 className={`upload-zone ${dragOver ? 'drag-over' : ''}`}
                 style={{ marginBottom: 12 }}
@@ -357,7 +559,17 @@ export default function Proposals() {
                 </table>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-                <button className="btn btn-secondary btn-sm" onClick={addItem}>+ Add Line</button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-secondary btn-sm" onClick={addItem}>+ Add Line</button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--blue-600)' }}
+                    onClick={() => setShowPricebook(true)}
+                    type="button"
+                  >
+                    <BookOpen size={13} /> Pricebook
+                  </button>
+                </div>
                 <div className="totals-box" style={{ minWidth: 240 }}>
                   <div className="totals-row"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
                   {parseFloat(form.tax_rate) > 0 && <div className="totals-row"><span>Tax ({form.tax_rate}%)</span><span>{fmt(taxAmt)}</span></div>}
