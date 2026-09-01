@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const db = require('../database');
 
 // Helper: load settings with defaults
-function getSettings() {
+async function getSettings() {
   const rows = await db.prepare('SELECT key, value FROM settings').all();
   const defaults = {
     company_name: 'Your Company Name',
@@ -51,7 +51,7 @@ function generateProposalNumber() {
 }
 
 // Helper: recalc totals
-function recalcTotals(proposalId) {
+async function recalcTotals(proposalId) {
   const items = await db.prepare('SELECT * FROM proposal_line_items WHERE proposal_id = ?').all(proposalId);
   const subtotal = items.reduce((sum, i) => sum + (i.total_price || 0), 0);
   const proposal = await db.prepare('SELECT tax_rate FROM proposals WHERE id = ?').get(proposalId);
@@ -115,16 +115,16 @@ router.post('/', async (req, res) => {
 
   // Insert line items if provided
   if (Array.isArray(line_items)) {
-    const insertItem = await db.prepare(`
-      INSERT INTO proposal_line_items (proposal_id, description, quantity, unit, unit_price, total_price, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    line_items.forEach((item, idx) => {
+    for (let idx = 0; idx < line_items.length; idx++) {
+      const item = line_items[idx];
       const qty = parseFloat(item.quantity) || 1;
       const price = parseFloat(item.unit_price) || 0;
-      await insertItem.run(proposalId, item.description, qty, item.unit || 'ea', price, qty * price, idx);
-    });
-    recalcTotals(proposalId);
+      await db.prepare(`
+        INSERT INTO proposal_line_items (proposal_id, description, quantity, unit, unit_price, total_price, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(proposalId, item.description, qty, item.unit || 'ea', price, qty * price, idx);
+    }
+    await recalcTotals(proposalId);
   }
 
   const proposal = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(proposalId);
@@ -197,16 +197,16 @@ router.put('/:id', async (req, res) => {
   // Replace line items if provided
   if (Array.isArray(line_items)) {
     await db.prepare('DELETE FROM proposal_line_items WHERE proposal_id = ?').run(req.params.id);
-    const insertItem = await db.prepare(`
-      INSERT INTO proposal_line_items (proposal_id, description, quantity, unit, unit_price, total_price, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    line_items.forEach((item, idx) => {
+    for (let idx = 0; idx < line_items.length; idx++) {
+      const item = line_items[idx];
       const qty = parseFloat(item.quantity) || 1;
       const price = parseFloat(item.unit_price) || 0;
-      await insertItem.run(req.params.id, item.description, qty, item.unit || 'ea', price, qty * price, idx);
-    });
-    recalcTotals(req.params.id);
+      await db.prepare(`
+        INSERT INTO proposal_line_items (proposal_id, description, quantity, unit, unit_price, total_price, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(req.params.id, item.description, qty, item.unit || 'ea', price, qty * price, idx);
+    }
+    await recalcTotals(req.params.id);
   }
 
   const proposal = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
@@ -238,7 +238,7 @@ router.get('/:id/pdf', async (req, res) => {
     'SELECT * FROM proposal_line_items WHERE proposal_id = ? ORDER BY sort_order ASC, id ASC'
   ).all(req.params.id);
 
-  const settings = getSettings();
+  const settings = await getSettings();
 
   // Build PDF
   const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
