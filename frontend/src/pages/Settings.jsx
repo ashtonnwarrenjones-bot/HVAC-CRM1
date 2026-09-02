@@ -3,7 +3,7 @@ import axios from 'axios';
 import SalesforceImport from '../components/SalesforceImport';
 import {
   Building2, FileText, Users, Database, Info,
-  Phone, Check, AlertCircle,
+  Phone, Check, AlertCircle, Link2,
 } from 'lucide-react';
 
 const DEFAULTS = {
@@ -33,11 +33,12 @@ const CARRIERS = [
 ];
 
 const NAV = [
-  { key: 'company',  label: 'Company Info',     Icon: Building2 },
-  { key: 'proposal', label: 'Proposal',          Icon: FileText  },
-  { key: 'users',    label: 'Users',             Icon: Users     },
-  { key: 'data',     label: 'Data',              Icon: Database  },
-  { key: 'about',    label: 'About',             Icon: Info      },
+  { key: 'company',     label: 'Company Info',     Icon: Building2 },
+  { key: 'proposal',    label: 'Proposal',          Icon: FileText  },
+  { key: 'users',       label: 'Users',             Icon: Users     },
+  { key: 'integrations',label: 'Integrations',      Icon: Link2     },
+  { key: 'data',        label: 'Data',              Icon: Database  },
+  { key: 'about',       label: 'About',             Icon: Info      },
 ];
 
 export default function Settings() {
@@ -401,6 +402,55 @@ export default function Settings() {
             <button className="btn btn-primary" onClick={createUser} disabled={creatingUser} style={{ width: '100%' }}>
               {creatingUser ? '⏳ Creating...' : '+ Create User'}
             </button>
+          </>
+        )}
+
+        {/* ── Integrations ── */}
+        {tab === 'integrations' && (
+          <>
+            {sectionTitle('Integrations', 'Connect third-party services to sync your data.')}
+
+            {/* QuickBooks */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, background: '#2CA01C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ color: '#fff', fontWeight: 900, fontSize: 18, fontFamily: 'serif' }}>QB</span>
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>QuickBooks Online</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>Sync invoices, customers, and payments</div>
+                </div>
+                <div style={{ marginLeft: 'auto' }}>
+                  <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 700, background: '#fef3c7', color: '#92400e' }}>Coming Soon</span>
+                </div>
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
+                When connected, Conduit will automatically push new invoices to QuickBooks, sync customer records, and pull payment status back in real time. No manual data entry between systems.
+              </p>
+              <div style={{ background: 'var(--bg-page)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
+                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>What will sync:</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 20px', color: 'var(--text-muted)' }}>
+                  {['✓ Customers → QuickBooks clients', '✓ Invoices → QB invoices', '✓ Payments pulled back in', '✓ Tax rates matched', '✓ Service items from Pricebook', '✓ Job completion triggers sync'].map(item => (
+                    <div key={item} style={{ fontSize: 12 }}>{item}</div>
+                  ))}
+                </div>
+              </div>
+              <button
+                disabled
+                style={{ padding: '10px 22px', borderRadius: 8, border: 'none', background: '#e5e7eb', color: '#9ca3af', fontWeight: 700, fontSize: 13, cursor: 'not-allowed', display: 'flex', alignItems: 'center', gap: 8 }}
+              >
+                <span style={{ fontSize: 16 }}>🔗</span> Connect QuickBooks Online
+              </button>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10 }}>
+                QuickBooks sync is on our roadmap. You'll need a QuickBooks Online account to use this feature.
+              </p>
+            </div>
+
+            {/* Placeholder for future integrations */}
+            <div style={{ background: 'var(--bg-card)', border: '1px dashed var(--border)', borderRadius: 12, padding: '20px 22px', opacity: 0.6 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>More integrations coming</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Stripe payments, Google Calendar, and more.</div>
+            </div>
           </>
         )}
 

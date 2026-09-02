@@ -813,6 +813,7 @@ async function initDb() {
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMP",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS carrier TEXT",
+    "ALTER TABLE job_time_entries ADD COLUMN IF NOT EXISTS username TEXT",
   ];
 
   for (const sql of columnMigrations) {

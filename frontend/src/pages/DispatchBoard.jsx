@@ -64,6 +64,81 @@ function JobDetailPanel({ job, techs, onClose, onUpdate }) {
   const [saving, setSaving] = useState(false);
   const [smsState, setSmsState] = useState(null); // null | 'sending' | { ok, msg }
 
+  // Time tracking
+  const [timeEntries, setTimeEntries] = useState([]);
+  const [clockingIn, setClockingIn] = useState(false);
+  const [activeEntry, setActiveEntry] = useState(null); // entry with no stopped_at
+
+  // Parts
+  const [parts, setParts] = useState([]);
+  const [showAddPart, setShowAddPart] = useState(false);
+  const [partForm, setPartForm] = useState({ name: '', quantity: 1, unit_cost: '' });
+  const [addingPart, setAddingPart] = useState(false);
+  const [pricebook, setPricebook] = useState([]);
+
+  useEffect(() => {
+    axios.get(`/api/mobile/jobs/${job.id}/time`).then(r => {
+      setTimeEntries(r.data);
+      setActiveEntry(r.data.find(e => !e.stopped_at) || null);
+    }).catch(() => {});
+    axios.get(`/api/mobile/jobs/${job.id}/parts`).then(r => setParts(r.data)).catch(() => {});
+    axios.get('/api/pricebook').then(r => setPricebook(r.data || [])).catch(() => {});
+  }, [job.id]);
+
+  const handleClockIn = async () => {
+    setClockingIn(true);
+    try {
+      await axios.post(`/api/mobile/jobs/${job.id}/time/start`);
+      const r = await axios.get(`/api/mobile/jobs/${job.id}/time`);
+      setTimeEntries(r.data);
+      setActiveEntry(r.data.find(e => !e.stopped_at) || null);
+    } catch(e) { alert(e.response?.data?.error || 'Clock-in failed'); }
+    setClockingIn(false);
+  };
+
+  const handleClockOut = async () => {
+    setClockingIn(true);
+    try {
+      await axios.post(`/api/mobile/jobs/${job.id}/time/stop`);
+      const r = await axios.get(`/api/mobile/jobs/${job.id}/time`);
+      setTimeEntries(r.data);
+      setActiveEntry(null);
+    } catch(e) { alert(e.response?.data?.error || 'Clock-out failed'); }
+    setClockingIn(false);
+  };
+
+  const handleAddPart = async () => {
+    if (!partForm.name.trim()) return;
+    setAddingPart(true);
+    try {
+      await axios.post(`/api/mobile/jobs/${job.id}/parts`, {
+        name: partForm.name,
+        quantity: parseFloat(partForm.quantity) || 1,
+        unit_cost: parseFloat(partForm.unit_cost) || 0,
+      });
+      const r = await axios.get(`/api/mobile/jobs/${job.id}/parts`);
+      setParts(r.data);
+      setPartForm({ name: '', quantity: 1, unit_cost: '' });
+      setShowAddPart(false);
+    } catch(e) { alert('Failed to add part'); }
+    setAddingPart(false);
+  };
+
+  const handleDeletePart = async (partId) => {
+    await axios.delete(`/api/mobile/jobs/${job.id}/parts/${partId}`);
+    setParts(p => p.filter(x => x.id !== partId));
+  };
+
+  const fmtDuration = (secs) => {
+    if (!secs) return '—';
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
+  const totalSeconds = timeEntries.reduce((sum, e) => sum + (e.duration_seconds || 0), 0);
+  const partsTotal = parts.reduce((sum, p) => sum + ((p.unit_cost || 0) * (p.quantity || 1)), 0);
+
   const colors = STATUS_COLORS[status] || STATUS_COLORS.scheduled;
 
   const handleSendSms = async () => {
@@ -263,6 +338,137 @@ function JobDetailPanel({ job, techs, onClose, onUpdate }) {
           </div>
         )}
 
+        {/* ── Time Tracking ── */}
+        <div style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={labelStyle}>⏱ Time Tracking {totalSeconds > 0 && `· ${fmtDuration(totalSeconds)} total`}</div>
+            {activeEntry ? (
+              <button
+                onClick={handleClockOut}
+                disabled={clockingIn}
+                style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', cursor: 'pointer' }}
+              >
+                {clockingIn ? '…' : '⏹ Clock Out'}
+              </button>
+            ) : (
+              <button
+                onClick={handleClockIn}
+                disabled={clockingIn}
+                style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#16a34a', border: '1px solid #bbf7d0', cursor: 'pointer' }}
+              >
+                {clockingIn ? '…' : '▶ Clock In'}
+              </button>
+            )}
+          </div>
+          {activeEntry && (
+            <div style={{ fontSize: 11, color: '#16a34a', background: '#dcfce7', borderRadius: 6, padding: '4px 8px', marginBottom: 6 }}>
+              🟢 Clocked in since {new Date(activeEntry.started_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </div>
+          )}
+          {timeEntries.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No time logged yet.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {timeEntries.map(e => (
+                <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {e.user_name || e.username || 'Tech'} · {new Date(e.started_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    {e.stopped_at && ` – ${new Date(e.stopped_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+                  </span>
+                  <span style={{ fontWeight: 600, color: e.stopped_at ? 'var(--text-primary)' : '#16a34a' }}>
+                    {e.stopped_at ? fmtDuration(e.duration_seconds) : 'active'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Parts Used ── */}
+        <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={labelStyle}>🔩 Parts Used {partsTotal > 0 && `· $${partsTotal.toFixed(2)}`}</div>
+            <button
+              onClick={() => setShowAddPart(p => !p)}
+              style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'var(--bg-page)', color: 'var(--text-primary)', border: '1px solid var(--border)', cursor: 'pointer' }}
+            >
+              {showAddPart ? '✕ Cancel' : '+ Add'}
+            </button>
+          </div>
+
+          {showAddPart && (
+            <div style={{ background: 'var(--bg-page)', borderRadius: 8, padding: 10, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <select
+                className="form-control"
+                style={{ fontSize: 12 }}
+                onChange={e => {
+                  const item = pricebook.find(p => String(p.id) === e.target.value);
+                  if (item) setPartForm(f => ({ ...f, name: item.name || item.description || '', unit_cost: item.price || item.unit_price || '' }));
+                }}
+              >
+                <option value="">— Select from pricebook or type below —</option>
+                {pricebook.map(p => <option key={p.id} value={p.id}>{p.name || p.description}</option>)}
+              </select>
+              <input
+                className="form-control"
+                style={{ fontSize: 12 }}
+                placeholder="Part description"
+                value={partForm.name}
+                onChange={e => setPartForm(f => ({ ...f, name: e.target.value }))}
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  className="form-control"
+                  style={{ fontSize: 12, width: 70 }}
+                  placeholder="Qty"
+                  type="number"
+                  min="1"
+                  value={partForm.quantity}
+                  onChange={e => setPartForm(f => ({ ...f, quantity: e.target.value }))}
+                />
+                <input
+                  className="form-control"
+                  style={{ fontSize: 12 }}
+                  placeholder="Unit cost ($)"
+                  type="number"
+                  step="0.01"
+                  value={partForm.unit_cost}
+                  onChange={e => setPartForm(f => ({ ...f, unit_cost: e.target.value }))}
+                />
+                <button
+                  onClick={handleAddPart}
+                  disabled={addingPart || !partForm.name.trim()}
+                  style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: 'var(--blue-600)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {addingPart ? '…' : 'Add'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {parts.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No parts logged.</div>
+          ) : (
+            <div>
+              {parts.map(p => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)', flex: 1 }}>{p.name} × {p.quantity}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: 10 }}>
+                    {p.unit_cost ? `$${(p.unit_cost * (p.quantity || 1)).toFixed(2)}` : '—'}
+                  </span>
+                  <button onClick={() => handleDeletePart(p.id)}
+                    style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 13, padding: '0 2px' }}>✕</button>
+                </div>
+              ))}
+              {partsTotal > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 12, fontWeight: 700, paddingTop: 6, color: 'var(--text-primary)' }}>
+                  Total: ${partsTotal.toFixed(2)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Quick status change */}
         <div style={{ marginTop: 20 }}>
           <div style={labelStyle}>Quick Status Update</div>
@@ -293,12 +499,25 @@ function JobDetailPanel({ job, techs, onClose, onUpdate }) {
       </div>
 
       {/* Footer */}
-      <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <a
+          href={`/job-report/${job.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '9px', background: 'var(--bg-page)', color: 'var(--text-primary)',
+            borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none',
+            border: '1px solid var(--border)',
+          }}
+        >
+          📄 Completion Report
+        </a>
         <a
           href={`/companies/${job.company_id}`}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '10px', background: 'var(--blue-600)', color: '#fff',
+            padding: '9px', background: 'var(--blue-600)', color: '#fff',
             borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none',
           }}
         >

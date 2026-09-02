@@ -32,6 +32,7 @@ import Pricebook from './pages/Pricebook';
 import Memberships from './pages/Memberships';
 import MyJobs from './pages/MyJobs';
 import ServiceRequests from './pages/ServiceRequests';
+import JobReport from './pages/JobReport';
 
 const ALL_NAV = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
@@ -474,6 +475,7 @@ function AppLayout() {
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/job-report/:id" element={<JobReport />} />
           <Route path="*" element={<Navigate to={role === 'technician' ? '/my-jobs' : '/'} replace />} />
         </Routes>
       </main>
@@ -496,6 +498,7 @@ export default function App() {
           {/* Password reset flow — public */}
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          {/* Job report — renders inside app layout (auth required) */}
           {/* All other routes go through the authenticated layout */}
           <Route path="/*" element={<AppLayout />} />
         </Routes>

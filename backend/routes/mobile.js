@@ -212,6 +212,62 @@ router.post('/jobs/:id/time/stop', async (req, res) => {
   }
 });
 
+// GET time entries for a job (for dispatch board)
+router.get('/jobs/:id/time', async (req, res) => {
+  try {
+    const entries = await db.prepare(`
+      SELECT jte.*, u.username, u.name AS user_name
+      FROM job_time_entries jte
+      LEFT JOIN users u ON u.id = jte.user_id
+      WHERE jte.job_id = ?
+      ORDER BY jte.started_at ASC
+    `).all(parseInt(req.params.id, 10));
+    res.json(entries);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE a part
+router.delete('/jobs/:jobId/parts/:partId', async (req, res) => {
+  try {
+    await db.prepare('DELETE FROM job_parts WHERE id = ? AND job_id = ?')
+      .run(parseInt(req.params.partId, 10), parseInt(req.params.jobId, 10));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET job completion report data
+router.get('/jobs/:id/report', async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    const job = await db.prepare(`
+      SELECT j.*, c.name AS company_name, c.address, c.city, c.state, c.zip, c.phone AS company_phone,
+             co.first_name || ' ' || co.last_name AS contact_name, co.phone AS contact_phone, co.email AS contact_email
+      FROM jobs j
+      LEFT JOIN companies c ON c.id = j.company_id
+      LEFT JOIN contacts co ON co.id = j.contact_id
+      WHERE j.id = ?
+    `).get(jobId);
+    if (!job) return res.status(404).json({ error: 'Not found' });
+
+    const parts = await db.prepare('SELECT * FROM job_parts WHERE job_id = ? ORDER BY logged_at ASC').all(jobId);
+    const timeEntries = await db.prepare(`
+      SELECT jte.*, u.username, u.name AS user_name
+      FROM job_time_entries jte LEFT JOIN users u ON u.id = jte.user_id
+      WHERE jte.job_id = ? ORDER BY jte.started_at ASC
+    `).all(jobId);
+    const notes = await db.prepare('SELECT * FROM job_notes WHERE job_id = ? ORDER BY created_at ASC').all(jobId);
+    const photos = await db.prepare('SELECT * FROM job_photos WHERE job_id = ? ORDER BY uploaded_at ASC').all(jobId);
+
+    res.json({ job, parts, timeEntries, notes, photos });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── Invoice send ─────────────────────────────────────────────────────────────
 router.post('/jobs/:id/invoice/send', async (req, res) => {
   try {
