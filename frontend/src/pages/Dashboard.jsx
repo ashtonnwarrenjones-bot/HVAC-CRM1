@@ -797,7 +797,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="page-header">
+      <div data-tour="dashboard" className="page-header">
         <div>
           <h2 style={{ margin:0 }}>Dashboard</h2>
           <span className="text-muted text-sm">{new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</span>

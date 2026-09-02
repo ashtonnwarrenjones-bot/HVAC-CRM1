@@ -227,7 +227,7 @@ export default function Settings() {
   );
 
   return (
-    <div style={{ display: 'flex', height: '100%', minHeight: 0, overflow: 'hidden' }}>
+    <div data-tour="settings" style={{ display: 'flex', height: '100%', minHeight: 0, overflow: 'hidden' }}>
 
       {/* ── Sidebar nav ── */}
       <div style={{

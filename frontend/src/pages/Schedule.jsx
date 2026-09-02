@@ -105,7 +105,7 @@ export default function Schedule() {
     <div className="sched-page">
 
       {/* ── Header ── */}
-      <div className="sched-top">
+      <div data-tour="schedule" className="sched-top">
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Schedule</h2>
           <p style={{ margin: '2px 0 0', color: '#888', fontSize: 13 }}>Manage service jobs and appointments</p>

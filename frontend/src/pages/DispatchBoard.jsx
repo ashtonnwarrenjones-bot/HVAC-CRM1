@@ -881,7 +881,7 @@ export default function DispatchBoard() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
 
       {/* ── Header ── */}
-      <div className="page-header" style={{ flexShrink: 0 }}>
+      <div data-tour="dispatch" className="page-header" style={{ flexShrink: 0 }}>
         <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
           <Calendar size={20} /> Dispatch Board
         </h2>

@@ -34,6 +34,7 @@ import MyJobs from './pages/MyJobs';
 import ServiceRequests from './pages/ServiceRequests';
 import JobReport from './pages/JobReport';
 import Vendors from './pages/Vendors';
+import GuidedTour, { TourLaunchButton } from './components/GuidedTour';
 
 const ALL_NAV = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
@@ -274,6 +275,18 @@ function AppLayout() {
   const [showSearch, setShowSearch] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [dark, setDark] = useDarkMode();
+  const [showTour, setShowTour] = useState(false);
+
+  // Auto-start tour for demo users on first visit
+  useEffect(() => {
+    if (isDemo || role === 'demo') {
+      try {
+        if (!localStorage.getItem('crm_tour_seen')) {
+          setShowTour(true);
+        }
+      } catch {}
+    }
+  }, [isDemo, role]);
   const notifsRef = useRef(null);
 
   // ⌘K / Ctrl+K to open search
@@ -376,6 +389,11 @@ function AppLayout() {
           ))}
         </div>
 
+        {/* Tour launch button — always visible in sidebar */}
+        <div style={{ padding: '8px 8px 0' }}>
+          <TourLaunchButton onClick={() => setShowTour(true)} />
+        </div>
+
         <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
           <a
             href="/portal"
@@ -458,7 +476,7 @@ function AppLayout() {
       )}
 
       {/* ── Main content ── */}
-      <main className="main">
+      <main className="main" data-tour="main">
         <Routes>
           <Route path="/" element={role === 'technician' ? <Navigate to="/my-jobs" replace /> : <Dashboard />} />
           <Route path="/my-jobs" element={<MyJobs />} />
@@ -485,6 +503,14 @@ function AppLayout() {
 
       {/* ── Global Search overlay ── */}
       {showSearch && <GlobalSearch onClose={() => setShowSearch(false)} />}
+
+      {/* ── Guided Tour overlay ── */}
+      {showTour && (
+        <GuidedTour onClose={() => {
+          setShowTour(false);
+          try { localStorage.setItem('crm_tour_seen', '1'); } catch {}
+        }} />
+      )}
     </div>
   );
 }
