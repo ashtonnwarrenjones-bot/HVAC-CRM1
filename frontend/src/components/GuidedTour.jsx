@@ -141,31 +141,29 @@ function fallbackRect() {
 export default function GuidedTour({ onClose }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
-  const [rect, setRect] = useState(null);
-  const [ready, setReady] = useState(false);
+  // Start with a centered fallback rect so tour is ALWAYS visible from mount
+  const [rect, setRect] = useState(() => fallbackRect());
   const timerRef = useRef();
   const retryRef = useRef();
 
   const current = STEPS[step];
 
-  // Navigate when step changes
+  // Combine navigate + element-finding into one effect to avoid race conditions
   useEffect(() => {
     navigate(current.route);
-  }, [step]);
 
-  // After step/navigation change, locate elements with retry
-  useEffect(() => {
     clearTimeout(timerRef.current);
     clearInterval(retryRef.current);
-    setReady(false);
 
-    // Phase 1: show nav highlight after short delay
+    // Reset to fallback immediately so spotlight repositions visibly
+    setRect(fallbackRect());
+
+    // Phase 1: highlight nav link after short delay
     timerRef.current = setTimeout(() => {
       const navRect = getRect(current.navTarget);
-      setRect(navRect || fallbackRect());
-      setReady(true);
+      if (navRect) setRect(navRect);
 
-      // Phase 2: after 900ms shift to content area, retry up to 8 times
+      // Phase 2: shift to content area, retry up to 10 times
       let attempts = 0;
       timerRef.current = setTimeout(() => {
         retryRef.current = setInterval(() => {
@@ -174,10 +172,12 @@ export default function GuidedTour({ onClose }) {
             getRect(current.contentTarget) ||
             getRect('[data-tour="main"]')   ||
             getRect('main');
-          if (cRect || attempts >= 8) {
+          if (cRect) {
             clearInterval(retryRef.current);
-            setRect(cRect || fallbackRect());
-            setReady(true);
+            setRect(cRect);
+          } else if (attempts >= 10) {
+            clearInterval(retryRef.current);
+            // stay on fallbackRect already set
           }
         }, 150);
       }, 900);
@@ -226,17 +226,13 @@ export default function GuidedTour({ onClose }) {
     overflow: 'hidden',
   };
 
-  // Never return null — always keep the tour mounted so state/timers survive
-  // While not ready, render invisible so the popover never flickers away
-  const hidden = !ready;
-
   return (
     <>
       {/* Spotlight box */}
-      <div style={hidden ? { display: 'none' } : spotStyle} />
+      <div style={spotStyle} />
 
       {/* Popover card */}
-      <div style={{ ...popoverStyle, display: hidden ? 'none' : undefined }}>
+      <div style={popoverStyle}>
         {/* Header */}
         <div style={{ background: 'linear-gradient(135deg, #1e40af, #3b82f6)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
