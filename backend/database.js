@@ -409,6 +409,25 @@ const SCHEMA_STATEMENTS = [
     status TEXT DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+
+  `CREATE TABLE IF NOT EXISTS integration_settings (
+    id SERIAL PRIMARY KEY,
+    integration_key TEXT UNIQUE NOT NULL,
+    config_json TEXT,
+    enabled BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS integration_sync_log (
+    id SERIAL PRIMARY KEY,
+    integration_key TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    status TEXT NOT NULL,
+    message TEXT,
+    details_json TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 
 // ─── Demo data seeder ─────────────────────────────────────────────────────────
@@ -814,6 +833,9 @@ async function initDb() {
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS carrier TEXT",
     "ALTER TABLE job_time_entries ADD COLUMN IF NOT EXISTS username TEXT",
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ce_job_number TEXT",
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ce_synced_at TIMESTAMP",
+    "ALTER TABLE job_parts ADD COLUMN IF NOT EXISTS ce_po_number TEXT",
   ];
 
   for (const sql of columnMigrations) {
