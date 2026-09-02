@@ -43,7 +43,6 @@ const ALL_NAV = [
   { to: '/contacts', label: 'Contacts', Icon: Users, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
   { to: '/proposals', label: 'Proposals', Icon: FileText, roles: ['admin', 'sales_rep', 'demo'] },
   { to: '/service-requests', label: 'Quote Requests', Icon: FileText, roles: ['admin', 'sales_rep'] },
-  { to: '/equipment', label: 'Equipment', Icon: Wrench, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/invoices', label: 'Invoices', Icon: Receipt, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/memberships', label: 'Memberships', Icon: Shield, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/pricebook', label: 'Pricebook', Icon: BookOpen, roles: ['admin', 'demo'] },

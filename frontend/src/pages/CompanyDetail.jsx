@@ -3,6 +3,28 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import EmailCompose from '../components/EmailCompose';
 
+const CONDITION_BADGE = {
+  good:      { cls: 'badge-green',  label: 'Good' },
+  fair:      { cls: 'badge-yellow', label: 'Fair' },
+  poor:      { cls: 'badge-red',    label: 'Poor' },
+  new:       { cls: 'badge-blue',   label: 'New'  },
+  replaced:  { cls: 'badge-gray',   label: 'Replaced' },
+};
+const EQ_EMPTY = {
+  unit_type: '', make: '', model: '', serial_number: '',
+  install_date: '', last_service_date: '', warranty_expiry: '',
+  location_notes: '', condition: 'good', notes: '',
+};
+function warrantyStatus(expiry) {
+  if (!expiry) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const exp = new Date(expiry + 'T00:00:00');
+  const diff = Math.round((exp - today) / 86400000);
+  if (diff < 0)   return { label: 'Expired',       cls: 'badge-red'    };
+  if (diff <= 90) return { label: `${diff}d left`,  cls: 'badge-yellow' };
+  return { label: 'Active', cls: 'badge-green' };
+}
+
 const API = import.meta.env.VITE_API_URL ?? '';
 
 const ACTIVITY_TYPES = [
@@ -109,6 +131,14 @@ export default function CompanyDetail() {
   const [jobPhotos, setJobPhotos] = useState([]); // photos for selectedJob
   const [loadingJobPhotos, setLoadingJobPhotos] = useState(false);
 
+  // Equipment state
+  const [equipment, setEquipment] = useState([]);
+  const [showEqModal, setShowEqModal] = useState(false);
+  const [eqForm, setEqForm] = useState(EQ_EMPTY);
+  const [editEqId, setEditEqId] = useState(null);
+  const [savingEq, setSavingEq] = useState(false);
+  const [eqErr, setEqErr] = useState('');
+
   // Sales rep state
   const [editingRep, setEditingRep] = useState(false);
   const [repForm, setRepForm] = useState({ sales_rep_name: '', sales_rep_email: '', sales_rep_phone: '' });
@@ -121,8 +151,10 @@ export default function CompanyDetail() {
     axios.get(`/api/jobs?company_id=${id}`).then(r =>
       setServiceJobs(r.data.sort((a, b) => (b.scheduled_date || '').localeCompare(a.scheduled_date || '')))
     ).catch(() => {}), [id]);
+  const loadEquipment = useCallback(() =>
+    axios.get('/api/equipment', { params: { company_id: id } }).then(r => setEquipment(r.data)).catch(() => {}), [id]);
 
-  useEffect(() => { load(); loadAttachments(); loadTasks(); loadPhotos(); loadServiceJobs(); }, [load, loadAttachments, loadTasks, loadPhotos, loadServiceJobs]);
+  useEffect(() => { load(); loadAttachments(); loadTasks(); loadPhotos(); loadServiceJobs(); loadEquipment(); }, [load, loadAttachments, loadTasks, loadPhotos, loadServiceJobs, loadEquipment]);
 
   const openJobPanel = async (job) => {
     setSelectedJob(job);
@@ -236,6 +268,37 @@ export default function CompanyDetail() {
     setEditingRep(false);
     load();
   };
+
+  // Equipment handlers
+  const openNewEq = () => { setEqForm(EQ_EMPTY); setEditEqId(null); setEqErr(''); setShowEqModal(true); };
+  const openEditEq = (item) => {
+    setEqForm({
+      unit_type: item.unit_type || '', make: item.make || '', model: item.model || '',
+      serial_number: item.serial_number || '',
+      install_date: item.install_date ? item.install_date.slice(0,10) : '',
+      last_service_date: item.last_service_date ? item.last_service_date.slice(0,10) : '',
+      warranty_expiry: item.warranty_expiry ? item.warranty_expiry.slice(0,10) : '',
+      location_notes: item.location_notes || '', condition: item.condition || 'good', notes: item.notes || '',
+    });
+    setEditEqId(item.id); setEqErr(''); setShowEqModal(true);
+  };
+  const saveEq = async () => {
+    setSavingEq(true); setEqErr('');
+    try {
+      const payload = { ...eqForm, company_id: id };
+      if (editEqId) await axios.put(`/api/equipment/${editEqId}`, payload);
+      else await axios.post('/api/equipment', payload);
+      setShowEqModal(false);
+      loadEquipment();
+    } catch (e) { setEqErr(e.response?.data?.error || 'Save failed.'); }
+    finally { setSavingEq(false); }
+  };
+  const deleteEq = async (eqId, label) => {
+    if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return;
+    await axios.delete(`/api/equipment/${eqId}`);
+    loadEquipment();
+  };
+  const ef = k => e => setEqForm(p => ({ ...p, [k]: e.target.value }));
 
   const cf = (k) => e => setContactForm(p => ({ ...p, [k]: k === 'is_primary' ? e.target.checked : e.target.value }));
   const fmt = (n) => '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0 });
@@ -411,6 +474,61 @@ export default function CompanyDetail() {
                 </div>
               )}
             </div>
+          {/* ── Equipment ── */}
+            <div className="card mt-4">
+              <div className="card-header">
+                <h3>🔩 Equipment ({equipment.length})</h3>
+                <button className="btn btn-secondary btn-sm" onClick={openNewEq}>+ Add</button>
+              </div>
+              {equipment.length === 0 ? (
+                <div style={{ padding: '16px 18px', color: '#9ca3af', fontSize: 13 }}>
+                  No equipment on file. Add units to track condition, warranty, and service history.
+                </div>
+              ) : (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Unit</th>
+                        <th>Serial #</th>
+                        <th>Condition</th>
+                        <th>Warranty</th>
+                        <th>Location</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {equipment.map(item => {
+                        const cond = CONDITION_BADGE[item.condition] || CONDITION_BADGE.good;
+                        const ws = warrantyStatus(item.warranty_expiry);
+                        const label = [item.unit_type, item.make, item.model].filter(Boolean).join(' ') || 'Unit';
+                        return (
+                          <tr key={item.id}>
+                            <td>
+                              <div style={{ fontWeight: 600, fontSize: 13 }}>{label}</div>
+                              {item.notes && <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{item.notes}</div>}
+                            </td>
+                            <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.serial_number || '—'}</td>
+                            <td><span className={`badge ${cond.cls}`}>{cond.label}</span></td>
+                            <td>
+                              {ws ? <span className={`badge ${ws.cls}`}>{ws.label}</span> : '—'}
+                            </td>
+                            <td style={{ fontSize: 12, color: 'var(--gray-500)' }}>{item.location_notes || '—'}</td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button className="btn btn-secondary btn-sm" onClick={() => openEditEq(item)}>✏</button>
+                                <button className="btn btn-danger btn-sm" onClick={() => deleteEq(item.id, label)}>✕</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
           {/* Attachments */}
             <div className="card mt-4">
               <div className="card-header">
@@ -1033,6 +1151,79 @@ export default function CompanyDetail() {
           }}
           onClose={() => setShowEmail(false)}
         />
+      )}
+
+      {/* ── Equipment Modal ── */}
+      {showEqModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowEqModal(false)}>
+          <div className="modal modal-lg">
+            <div className="modal-header">
+              <h3>{editEqId ? 'Edit Equipment' : 'Add Equipment'}</h3>
+              <button className="btn btn-ghost" onClick={() => setShowEqModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {eqErr && <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fef2f2', color: '#b91c1c', borderRadius: 6, fontSize: 13 }}>{eqErr}</div>}
+              <div className="form-grid-3">
+                <div className="form-group">
+                  <label className="form-label">Unit Type</label>
+                  <input className="form-control" value={eqForm.unit_type} onChange={ef('unit_type')} placeholder="RTU, Split, Boiler…" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Make</label>
+                  <input className="form-control" value={eqForm.make} onChange={ef('make')} placeholder="Carrier, Trane…" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Model</label>
+                  <input className="form-control" value={eqForm.model} onChange={ef('model')} placeholder="48XC048-5" />
+                </div>
+              </div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">Serial Number</label>
+                  <input className="form-control" value={eqForm.serial_number} onChange={ef('serial_number')} placeholder="SN-000000" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Condition</label>
+                  <select className="form-control" value={eqForm.condition} onChange={ef('condition')}>
+                    <option value="new">New</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                    <option value="replaced">Replaced</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-grid-3">
+                <div className="form-group">
+                  <label className="form-label">Install Date</label>
+                  <input className="form-control" type="date" value={eqForm.install_date} onChange={ef('install_date')} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Last Service</label>
+                  <input className="form-control" type="date" value={eqForm.last_service_date} onChange={ef('last_service_date')} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Warranty Expiry</label>
+                  <input className="form-control" type="date" value={eqForm.warranty_expiry} onChange={ef('warranty_expiry')} />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Location Notes</label>
+                <input className="form-control" value={eqForm.location_notes} onChange={ef('location_notes')} placeholder="Rooftop unit 3, northeast corner…" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Notes</label>
+                <textarea className="form-control" rows={2} value={eqForm.notes} onChange={ef('notes')} placeholder="Additional details…" />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowEqModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveEq} disabled={savingEq}>
+                {savingEq ? 'Saving…' : editEqId ? 'Update' : 'Add Equipment'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Log Activity / Meeting Summary Modal ── */}
