@@ -163,21 +163,19 @@ export default function GuidedTour({ onClose }) {
       const navRect = getRect(current.navTarget);
       if (navRect) setRect(navRect);
 
-      // Phase 2: shift to content area, retry up to 10 times
+      // Phase 2: shift to content target, retry up to 10 times
+      // Do NOT fall back to main/body — too large, pushes popover off-screen
       let attempts = 0;
       timerRef.current = setTimeout(() => {
         retryRef.current = setInterval(() => {
           attempts++;
-          const cRect =
-            getRect(current.contentTarget) ||
-            getRect('[data-tour="main"]')   ||
-            getRect('main');
+          const cRect = getRect(current.contentTarget);
           if (cRect) {
             clearInterval(retryRef.current);
             setRect(cRect);
           } else if (attempts >= 10) {
             clearInterval(retryRef.current);
-            // stay on fallbackRect already set
+            // stay on centered fallbackRect already set
           }
         }, 150);
       }, 900);
