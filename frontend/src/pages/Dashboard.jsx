@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   AlertTriangle, ClipboardList, Building2, TrendingUp, Wrench,
   DollarSign, Users, Settings2, GripVertical, X, Plus, Eye,
-  Calendar, Target, Award, Clock, BarChart2, Zap,
+  Calendar, Target, Award, Clock, BarChart2, Zap, Maximize2, Minimize2,
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -79,6 +79,45 @@ const DEFAULT_VISIBLE = [
   'recent_accounts', 'contract_breakdown',
 ];
 
+// ─── Role presets ─────────────────────────────────────────────────────────────
+const PRESETS = [
+  {
+    key: 'default',
+    label: 'Overview',
+    icon: '🏠',
+    desc: 'General snapshot of the whole business',
+    visible: DEFAULT_VISIBLE,
+  },
+  {
+    key: 'sales',
+    label: 'Sales',
+    icon: '💰',
+    desc: 'Pipeline, win rate, top customers & funnel',
+    visible: ['stats_row', 'win_rate', 'proposal_funnel', 'revenue_chart', 'top_customers', 'recent_proposals', 'tasks'],
+  },
+  {
+    key: 'dispatch',
+    label: 'Dispatch',
+    icon: '🚚',
+    desc: "Today's jobs, schedule & job status chart",
+    visible: ['today_jobs', 'upcoming_schedule', 'jobs_chart', 'tasks'],
+  },
+  {
+    key: 'admin',
+    label: 'Admin',
+    icon: '🗂️',
+    desc: 'Accounts, contracts, revenue & pipeline',
+    visible: ['stats_row', 'contract_breakdown', 'revenue_chart', 'top_customers', 'recent_accounts', 'tasks'],
+  },
+  {
+    key: 'executive',
+    label: 'Executive',
+    icon: '📊',
+    desc: 'High-level KPIs — revenue, win rate, pipeline & accounts',
+    visible: ['stats_row', 'revenue_chart', 'win_rate', 'top_customers', 'contract_breakdown'],
+  },
+];
+
 function loadLayout() {
   try {
     const raw = localStorage.getItem('crm_dashboard_layout_v2');
@@ -86,10 +125,10 @@ function loadLayout() {
       const parsed = JSON.parse(raw);
       const allKeys = Object.keys(WIDGET_DEFS);
       const missing = allKeys.filter(k => !parsed.visible.includes(k) && !parsed.hidden.includes(k));
-      return { visible: [...parsed.visible, ...missing], hidden: parsed.hidden || [] };
+      return { visible: [...parsed.visible, ...missing], hidden: parsed.hidden || [], sizes: parsed.sizes || {} };
     }
   } catch {}
-  return { visible: [...DEFAULT_VISIBLE], hidden: [] };
+  return { visible: [...DEFAULT_VISIBLE], hidden: [], sizes: {} };
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -104,10 +143,11 @@ export default function Dashboard() {
   const [newTaskDue, setNewTaskDue] = useState('');
   const [addingTask, setAddingTask] = useState(false);
 
-  const [customizing, setCustomizing] = useState(false);
-  const [layout,      setLayout]      = useState(loadLayout);
-  const [dragIdx,     setDragIdx]     = useState(null);
-  const [dragOverIdx, setDragOverIdx] = useState(null);
+  const [customizing,   setCustomizing]   = useState(false);
+  const [layout,        setLayout]        = useState(loadLayout);
+  const [dragIdx,       setDragIdx]       = useState(null);
+  const [dragOverIdx,   setDragOverIdx]   = useState(null);
+  const [showPresets,   setShowPresets]   = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem('crm_dashboard_layout_v2', JSON.stringify(layout)); } catch {}
@@ -144,9 +184,26 @@ export default function Dashboard() {
   };
 
   // ── Layout helpers ──
-  const hideWidget  = (key) => setLayout(l => ({ visible: l.visible.filter(k=>k!==key), hidden: [...l.hidden, key] }));
-  const showWidget  = (key) => setLayout(l => ({ visible: [...l.visible, key], hidden: l.hidden.filter(k=>k!==key) }));
-  const resetLayout = () => setLayout({ visible: [...DEFAULT_VISIBLE], hidden: Object.keys(WIDGET_DEFS).filter(k => !DEFAULT_VISIBLE.includes(k)) });
+  const hideWidget   = (key) => setLayout(l => ({ ...l, visible: l.visible.filter(k=>k!==key), hidden: [...l.hidden, key] }));
+  const showWidget   = (key) => setLayout(l => ({ ...l, visible: [...l.visible, key], hidden: l.hidden.filter(k=>k!==key) }));
+  const toggleSize   = (key) => setLayout(l => {
+    const defaultSize = WIDGET_DEFS[key]?.size || 'half';
+    const current = l.sizes?.[key] ?? defaultSize;
+    const next = current === 'full' ? 'half' : 'full';
+    // If toggling back to the default, remove the override to keep things clean
+    if (next === defaultSize) {
+      const { [key]: _, ...rest } = l.sizes || {};
+      return { ...l, sizes: rest };
+    }
+    return { ...l, sizes: { ...(l.sizes||{}), [key]: next } };
+  });
+  const resetLayout  = () => setLayout({ visible: [...DEFAULT_VISIBLE], hidden: Object.keys(WIDGET_DEFS).filter(k => !DEFAULT_VISIBLE.includes(k)), sizes: {} });
+  const applyPreset  = (preset) => {
+    const allKeys = Object.keys(WIDGET_DEFS);
+    setLayout({ visible: preset.visible.filter(k => allKeys.includes(k)), hidden: allKeys.filter(k => !preset.visible.includes(k)), sizes: {} });
+    setShowPresets(false);
+    setCustomizing(false);
+  };
 
   const handleDragStart = (idx) => setDragIdx(idx);
   const handleDragOver  = (e, idx) => { e.preventDefault(); if (idx !== dragIdx) setDragOverIdx(idx); };
@@ -689,8 +746,10 @@ export default function Dashboard() {
   function renderWidget(key, idx) {
     const def = WIDGET_DEFS[key];
     if (!def) return null;
-    const isDragging   = dragIdx === idx;
-    const isDragTarget = dragOverIdx === idx && dragIdx !== idx;
+    const isDragging    = dragIdx === idx;
+    const isDragTarget  = dragOverIdx === idx && dragIdx !== idx;
+    const effectiveSize = layout.sizes?.[key] ?? def.size;
+    const isFull        = effectiveSize === 'full';
     return (
       <div
         key={key}
@@ -700,7 +759,7 @@ export default function Dashboard() {
         onDrop={(e) => handleDrop(e, idx)}
         onDragEnd={handleDragEnd}
         style={{
-          gridColumn: def.size === 'full' ? '1 / -1' : 'span 1',
+          gridColumn: isFull ? '1 / -1' : 'span 1',
           opacity: isDragging ? 0.3 : 1,
           transition: 'opacity 0.15s',
           outline: isDragTarget ? '2px dashed #2563eb' : customizing ? '2px dashed var(--border)' : 'none',
@@ -714,9 +773,19 @@ export default function Dashboard() {
             <span style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#1d4ed8' }}>
               <GripVertical size={14} style={{ opacity:0.6 }} />{def.label}
             </span>
-            <button onClick={()=>hideWidget(key)} title="Hide" style={{ background:'none', border:'none', cursor:'pointer', color:'#6b7280', display:'flex', alignItems:'center', padding:2, borderRadius:4 }}>
-              <X size={14} />
-            </button>
+            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <button
+                onClick={()=>toggleSize(key)}
+                title={isFull ? 'Make half width' : 'Make full width'}
+                style={{ background:'none', border:'1px solid #bfdbfe', cursor:'pointer', color:'#1d4ed8', display:'flex', alignItems:'center', gap:4, padding:'2px 7px', borderRadius:5, fontSize:11, fontWeight:600 }}
+              >
+                {isFull ? <Minimize2 size={11}/> : <Maximize2 size={11}/>}
+                {isFull ? 'Half' : 'Full'}
+              </button>
+              <button onClick={()=>hideWidget(key)} title="Hide" style={{ background:'none', border:'none', cursor:'pointer', color:'#6b7280', display:'flex', alignItems:'center', padding:2, borderRadius:4 }}>
+                <X size={14} />
+              </button>
+            </div>
           </div>
         )}
         {renderWidgetContent(key)}
@@ -733,13 +802,49 @@ export default function Dashboard() {
           <h2 style={{ margin:0 }}>Dashboard</h2>
           <span className="text-muted text-sm">{new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</span>
         </div>
-        <button
-          onClick={()=>setCustomizing(c=>!c)}
-          style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:customizing?'#1e3a5f':'var(--bg-card)', color:customizing?'#fff':'var(--text-secondary)', fontSize:13, fontWeight:600, cursor:'pointer' }}
-        >
-          <Settings2 size={14} />
-          {customizing ? 'Done Editing' : 'Customize'}
-        </button>
+        <div style={{ display:'flex', alignItems:'center', gap:8, position:'relative' }}>
+          {/* Preset picker */}
+          <div style={{ position:'relative' }}>
+            <button
+              onClick={()=>setShowPresets(p=>!p)}
+              style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 14px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-card)', color:'var(--text-secondary)', fontSize:13, fontWeight:600, cursor:'pointer' }}
+            >
+              <Zap size={14} /> Views
+            </button>
+            {showPresets && (
+              <>
+                {/* Backdrop */}
+                <div onClick={()=>setShowPresets(false)} style={{ position:'fixed', inset:0, zIndex:99 }} />
+                <div style={{ position:'absolute', top:'calc(100% + 6px)', right:0, zIndex:100, background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:12, boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:8, minWidth:240 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.05em', padding:'4px 8px 8px' }}>Dashboard Views</div>
+                  {PRESETS.map(preset => (
+                    <button
+                      key={preset.key}
+                      onClick={()=>applyPreset(preset)}
+                      style={{ display:'flex', alignItems:'flex-start', gap:10, width:'100%', padding:'9px 10px', borderRadius:8, border:'none', background:'transparent', cursor:'pointer', textAlign:'left' }}
+                      onMouseEnter={e=>e.currentTarget.style.background='var(--bg-hover,#f3f4f6)'}
+                      onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                    >
+                      <span style={{ fontSize:18, lineHeight:1 }}>{preset.icon}</span>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:700, color:'var(--text-primary)' }}>{preset.label}</div>
+                        <div style={{ fontSize:11, color:'#6b7280', marginTop:1 }}>{preset.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          {/* Customize toggle */}
+          <button
+            onClick={()=>setCustomizing(c=>!c)}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:customizing?'#1e3a5f':'var(--bg-card)', color:customizing?'#fff':'var(--text-secondary)', fontSize:13, fontWeight:600, cursor:'pointer' }}
+          >
+            <Settings2 size={14} />
+            {customizing ? 'Done Editing' : 'Customize'}
+          </button>
+        </div>
       </div>
 
       <div className="page-content">
@@ -747,7 +852,7 @@ export default function Dashboard() {
         {customizing && (
           <div style={{ marginBottom:16, padding:'14px 18px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:12, display:'flex', alignItems:'flex-start', gap:16, flexWrap:'wrap' }}>
             <div style={{ flex:1, minWidth:220 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#1e3a5f', marginBottom:3 }}>Drag to reorder · Click × to hide a widget</div>
+              <div style={{ fontSize:13, fontWeight:700, color:'#1e3a5f', marginBottom:3 }}>Drag to reorder · Half/Full to resize · × to hide</div>
               <div style={{ fontSize:12, color:'#4b5563' }}>Layout saves automatically to your browser.</div>
             </div>
             {layout.hidden.length > 0 && (
