@@ -54,6 +54,7 @@ app.use('/api/sms', requireAuth, demoGuard, require('./routes/sms'));
 app.use('/api/search', requireAuth, require('./routes/search'));
 app.use('/api/mobile', requireAuth, require('./routes/mobile'));
 app.use('/api/integrations', requireAuth, demoGuard, require('./routes/integrations'));
+app.use('/api/vendors', requireAuth, demoGuard, require('./routes/vendors'));
 
 // Portal admin routes (admin JWT required)
 app.use('/api/portal/admin', requireAuth, demoGuard, portalRouter);

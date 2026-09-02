@@ -8,7 +8,7 @@ import {
   FileText, BarChart2, Settings as SettingsIcon, Globe,
   Bell, LogOut, Menu, X, CheckCircle, Clock, Trash2,
   Search, Wrench, Receipt, Command, Sun, Moon,
-  BookOpen, Shield, Trello
+  BookOpen, Shield, Trello, Truck
 } from 'lucide-react';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
@@ -33,6 +33,7 @@ import Memberships from './pages/Memberships';
 import MyJobs from './pages/MyJobs';
 import ServiceRequests from './pages/ServiceRequests';
 import JobReport from './pages/JobReport';
+import Vendors from './pages/Vendors';
 
 const ALL_NAV = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
@@ -47,6 +48,7 @@ const ALL_NAV = [
   { to: '/invoices', label: 'Invoices', Icon: Receipt, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/memberships', label: 'Memberships', Icon: Shield, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/pricebook', label: 'Pricebook', Icon: BookOpen, roles: ['admin', 'demo'] },
+  { to: '/vendors', label: 'Vendors', Icon: Truck, roles: ['admin', 'dispatcher'] },
   { to: '/analytics', label: 'Analytics', Icon: BarChart2, roles: ['admin', 'sales_rep', 'demo'] },
 ];
 
@@ -474,6 +476,7 @@ function AppLayout() {
           <Route path="/pricebook" element={<Pricebook />} />
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/vendors" element={<Vendors />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/job-report/:id" element={<JobReport />} />
           <Route path="*" element={<Navigate to={role === 'technician' ? '/my-jobs' : '/'} replace />} />

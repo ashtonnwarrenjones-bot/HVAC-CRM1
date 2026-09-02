@@ -428,6 +428,57 @@ const SCHEMA_STATEMENTS = [
     details_json TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+
+  // ─── Vendors / Suppliers ─────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS vendors (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    contact_name TEXT,
+    email TEXT,
+    phone TEXT,
+    parts_counter_phone TEXT,
+    website TEXT,
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    zip TEXT,
+    notes TEXT,
+    account_number TEXT,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS vendor_brands (
+    id SERIAL PRIMARY KEY,
+    vendor_id INTEGER REFERENCES vendors(id) ON DELETE CASCADE,
+    brand TEXT NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS vendor_parts (
+    id SERIAL PRIMARY KEY,
+    vendor_id INTEGER REFERENCES vendors(id) ON DELETE CASCADE,
+    manufacturer_part_no TEXT,
+    vendor_part_no TEXT,
+    description TEXT NOT NULL,
+    unit_cost DECIMAL(10,2) DEFAULT 0,
+    unit TEXT DEFAULT 'each',
+    pricebook_item_id INTEGER REFERENCES pricebook_items(id) ON DELETE SET NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS quote_requests (
+    id SERIAL PRIMARY KEY,
+    job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+    vendor_id INTEGER REFERENCES vendors(id) ON DELETE SET NULL,
+    manufacturer TEXT,
+    model TEXT,
+    serial_number TEXT,
+    description TEXT,
+    photo_urls TEXT,
+    status TEXT DEFAULT 'sent',
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT
+  )`,
 ];
 
 // ─── Demo data seeder ─────────────────────────────────────────────────────────
@@ -836,6 +887,9 @@ async function initDb() {
     "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ce_job_number TEXT",
     "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ce_synced_at TIMESTAMP",
     "ALTER TABLE job_parts ADD COLUMN IF NOT EXISTS ce_po_number TEXT",
+    "ALTER TABLE pricebook_items ADD COLUMN IF NOT EXISTS vendor_id INTEGER REFERENCES vendors(id) ON DELETE SET NULL",
+    "ALTER TABLE pricebook_items ADD COLUMN IF NOT EXISTS vendor_part_number TEXT",
+    "ALTER TABLE pricebook_items ADD COLUMN IF NOT EXISTS vendor_cost DECIMAL(10,2)",
   ];
 
   for (const sql of columnMigrations) {
