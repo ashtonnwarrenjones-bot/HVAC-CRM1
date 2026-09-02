@@ -115,60 +115,79 @@ const STEPS = [
 
 function getRect(selector) {
   if (!selector) return null;
-  const el = document.querySelector(selector);
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  return { top: r.top, left: r.left, width: r.width, height: r.height };
+  try {
+    const el = document.querySelector(selector);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) return null;
+    return { top: r.top, left: r.left, width: r.width, height: r.height };
+  } catch { return null; }
+}
+
+// Centered fallback rect — shown in middle of screen when element not found
+function fallbackRect() {
+  const w = Math.min(600, window.innerWidth * 0.85);
+  const h = 120;
+  return {
+    top:  (window.innerHeight - h) / 2 - 80,
+    left: (window.innerWidth  - w) / 2,
+    width: w,
+    height: h,
+  };
 }
 
 // ─── GuidedTour ───────────────────────────────────────────────────────────────
 
 export default function GuidedTour({ onClose }) {
-  const navigate    = useNavigate();
-  const location    = useLocation();
-  const [step, setStep]   = useState(0);
-  const [rect, setRect]   = useState(null);
-  const [phase, setPhase] = useState('nav');   // 'nav' | 'content'
-  const [visible, setVisible] = useState(false);
+  const navigate = useNavigate();
+  const [step, setStep] = useState(0);
+  const [rect, setRect] = useState(null);
+  const [ready, setReady] = useState(false);
   const timerRef = useRef();
+  const retryRef = useRef();
 
   const current = STEPS[step];
 
-  // Navigate to the step's route when step changes
+  // Navigate when step changes
   useEffect(() => {
     navigate(current.route);
   }, [step]);
 
-  // After navigation, wait for render then position spotlight
+  // After step/navigation change, locate elements with retry
   useEffect(() => {
     clearTimeout(timerRef.current);
-    setVisible(false);
+    clearInterval(retryRef.current);
+    setReady(false);
 
+    // Phase 1: show nav highlight after short delay
     timerRef.current = setTimeout(() => {
-      // First: highlight the sidebar nav item
-      setPhase('nav');
       const navRect = getRect(current.navTarget);
-      if (navRect) {
-        setRect(navRect);
-        setVisible(true);
-      }
+      setRect(navRect || fallbackRect());
+      setReady(true);
 
-      // After 900ms: shift spotlight to main content area
+      // Phase 2: after 900ms shift to content area, retry up to 8 times
+      let attempts = 0;
       timerRef.current = setTimeout(() => {
-        setPhase('content');
-        const cRect =
-          getRect(current.contentTarget) ||
-          getRect('[data-tour="main"]') ||
-          getRect('main');
-        if (cRect) {
-          setRect(cRect);
-          setVisible(true);
-        }
+        retryRef.current = setInterval(() => {
+          attempts++;
+          const cRect =
+            getRect(current.contentTarget) ||
+            getRect('[data-tour="main"]')   ||
+            getRect('main');
+          if (cRect || attempts >= 8) {
+            clearInterval(retryRef.current);
+            setRect(cRect || fallbackRect());
+            setReady(true);
+          }
+        }, 150);
       }, 900);
-    }, 400);
+    }, 350);
 
-    return () => clearTimeout(timerRef.current);
-  }, [step, location.pathname]);
+    return () => {
+      clearTimeout(timerRef.current);
+      clearInterval(retryRef.current);
+    };
+  }, [step]);
 
   const prev = () => step > 0 && setStep(s => s - 1);
   const next = () => step < STEPS.length - 1 ? setStep(s => s + 1) : onClose();
@@ -185,27 +204,30 @@ export default function GuidedTour({ onClose }) {
     border: '2px solid rgba(255,255,255,0.6)',
     zIndex: 9900,
     pointerEvents: 'none',
-    transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
+    transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
   } : null;
 
-  // Popover position: below spotlight if it's in top 60% of screen, else above
-  const popoverOnTop = rect && (rect.top + rect.height / 2) > window.innerHeight * 0.55;
-  const popoverStyle = rect ? {
+  // Popover: below spotlight when in top half of screen, else above
+  const screenMid  = window.innerHeight * 0.55;
+  const spotMid    = rect ? rect.top + rect.height / 2 : 0;
+  const popoverOnTop = spotMid > screenMid;
+  const popoverStyle = {
     position: 'fixed',
     left: '50%',
     transform: 'translateX(-50%)',
-    ...(popoverOnTop
-      ? { bottom: window.innerHeight - rect.top + pad + 12 }
-      : { top: rect.top + rect.height + pad + 12 }),
+    ...(rect && popoverOnTop
+      ? { bottom: window.innerHeight - (rect.top - pad) + 12 }
+      : { top: rect ? (rect.top + rect.height + pad + 12) : '50%' }),
     zIndex: 9901,
     width: 'min(480px, 90vw)',
     background: '#fff',
     borderRadius: 16,
     boxShadow: '0 8px 40px rgba(0,0,0,0.35)',
     overflow: 'hidden',
-  } : null;
+  };
 
-  if (!visible || !rect) return null;
+  // Always render — never return null — so tour never disappears
+  if (!ready) return null;
 
   return (
     <>
