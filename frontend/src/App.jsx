@@ -389,10 +389,12 @@ function AppLayout() {
           ))}
         </div>
 
-        {/* Tour launch button — always visible in sidebar */}
-        <div style={{ padding: '8px 8px 0' }}>
-          <TourLaunchButton onClick={() => setShowTour(true)} />
-        </div>
+        {/* Tour launch button — demo mode only */}
+        {(isDemo || role === 'demo') && (
+          <div style={{ padding: '8px 8px 0' }}>
+            <TourLaunchButton onClick={() => setShowTour(true)} />
+          </div>
+        )}
 
         <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
           <a
