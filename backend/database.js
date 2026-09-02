@@ -811,6 +811,8 @@ async function initDb() {
     "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS invoice_created BOOLEAN DEFAULT FALSE",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token TEXT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMP",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS carrier TEXT",
   ];
 
   for (const sql of columnMigrations) {

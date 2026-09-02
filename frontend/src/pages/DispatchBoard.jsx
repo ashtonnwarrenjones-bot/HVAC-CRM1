@@ -4,7 +4,7 @@ import {
   Calendar, ChevronLeft, ChevronRight, Users, Plus, X,
   MapPin, Phone, User, Clock, Briefcase, ChevronRight as ChevRight,
   AlertCircle, Loader, Building2, Edit3, CheckCircle,
-  ChevronsLeft, ChevronsRight
+  ChevronsLeft, ChevronsRight, MessageSquare, Map, LayoutTemplate
 } from 'lucide-react';
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7am–7pm
@@ -62,8 +62,32 @@ function CapacityBar({ jobs, dayHours = 9 }) {
 function JobDetailPanel({ job, techs, onClose, onUpdate }) {
   const [status, setStatus] = useState(job.status);
   const [saving, setSaving] = useState(false);
+  const [smsState, setSmsState] = useState(null); // null | 'sending' | { ok, msg }
 
   const colors = STATUS_COLORS[status] || STATUS_COLORS.scheduled;
+
+  const handleSendSms = async () => {
+    if (!job.technician) return;
+    setSmsState('sending');
+    try {
+      const res = await axios.post('/api/sms/dispatch', {
+        job_id: job.id,
+        to_username: job.technician,
+      });
+      setSmsState({ ok: true, msg: `Sent to ${res.data.to}` });
+    } catch (err) {
+      const errData = err.response?.data;
+      // 503 = Twilio not configured — show preview note
+      if (err.response?.status === 503) {
+        setSmsState({ ok: false, msg: errData?.error || 'SMS not configured.' });
+      } else if (err.response?.status === 422) {
+        setSmsState({ ok: false, msg: errData?.error || 'Tech has no phone number.' });
+      } else {
+        setSmsState({ ok: false, msg: errData?.error || 'Failed to send SMS.' });
+      }
+    }
+    setTimeout(() => setSmsState(null), 5000);
+  };
 
   const handleStatusChange = async (newStatus) => {
     setStatus(newStatus);
@@ -89,6 +113,7 @@ function JobDetailPanel({ job, techs, onClose, onUpdate }) {
     }}>
       <style>{`
         @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
 
       {/* Header */}
@@ -172,12 +197,40 @@ function JobDetailPanel({ job, techs, onClose, onUpdate }) {
           </div>
         )}
 
-        {/* Technician */}
+        {/* Technician + SMS */}
         <div style={rowStyle}>
           <Users size={15} color="var(--text-muted)" style={{ flexShrink: 0, marginTop: 1 }} />
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={labelStyle}>Technician</div>
-            <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{job.technician || 'Unassigned'}</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{job.technician || 'Unassigned'}</div>
+              {job.technician && (
+                <button
+                  onClick={handleSendSms}
+                  disabled={smsState === 'sending'}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700,
+                    background: smsState?.ok === true ? '#dcfce7' : smsState?.ok === false ? '#fef2f2' : '#f0f9ff',
+                    color: smsState?.ok === true ? '#166534' : smsState?.ok === false ? '#dc2626' : '#0369a1',
+                    border: `1px solid ${smsState?.ok === true ? '#bbf7d0' : smsState?.ok === false ? '#fecaca' : '#bae6fd'}`,
+                    cursor: smsState === 'sending' ? 'default' : 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {smsState === 'sending'
+                    ? <Loader size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                    : <MessageSquare size={11} />
+                  }
+                  {smsState === 'sending' ? 'Sending…' : smsState?.ok === true ? '✓ Sent' : smsState?.ok === false ? 'Failed' : 'Text Tech'}
+                </button>
+              )}
+            </div>
+            {smsState && typeof smsState === 'object' && (
+              <div style={{ fontSize: 11, marginTop: 4, color: smsState.ok ? '#16a34a' : '#dc2626' }}>
+                {smsState.msg}
+              </div>
+            )}
           </div>
         </div>
 
@@ -407,6 +460,131 @@ function CreateJobModal({ defaultDate, defaultTech, techs, onClose, onCreate }) 
   );
 }
 
+// ─── GPS Map View ─────────────────────────────────────────────────────────────
+function MapView() {
+  const mapRef    = useRef(null);
+  const leafletRef = useRef(null);
+  const [locs, setLocs] = useState([]);
+  const [error, setError] = useState('');
+  const markersRef = useRef([]);
+
+  // Load Leaflet from CDN once
+  useEffect(() => {
+    const cssId = 'leaflet-css';
+    const jsId  = 'leaflet-js';
+
+    const loadMap = () => {
+      if (!window.L || leafletRef.current) return;
+      const map = window.L.map(mapRef.current, { zoomControl: true }).setView([39.5, -98.35], 4);
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 18,
+      }).addTo(map);
+      leafletRef.current = map;
+      fetchLocs(map);
+    };
+
+    if (!document.getElementById(cssId)) {
+      const link  = document.createElement('link');
+      link.id     = cssId;
+      link.rel    = 'stylesheet';
+      link.href   = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.appendChild(link);
+    }
+    if (!document.getElementById(jsId)) {
+      const script = document.createElement('script');
+      script.id    = jsId;
+      script.src   = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      script.onload = loadMap;
+      document.head.appendChild(script);
+    } else if (window.L) {
+      loadMap();
+    } else {
+      document.getElementById(jsId).addEventListener('load', loadMap);
+    }
+
+    return () => {
+      if (leafletRef.current) { leafletRef.current.remove(); leafletRef.current = null; }
+    };
+  }, []);
+
+  const fetchLocs = async (map) => {
+    try {
+      const res = await axios.get('/api/mobile/techs/locations');
+      const data = res.data || [];
+      setLocs(data);
+
+      // Clear old markers
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+
+      const bounds = [];
+      data.forEach(loc => {
+        if (!loc.lat || !loc.lng) return;
+        const hue = (loc.username?.charCodeAt(0) * 37) % 360;
+        const iconHtml = `
+          <div style="
+            width:32px;height:32px;border-radius:50%;
+            background:hsl(${hue},55%,45%);
+            border:3px solid #fff;
+            box-shadow:0 2px 8px rgba(0,0,0,0.3);
+            display:flex;align-items:center;justify-content:center;
+            color:#fff;font-weight:700;font-size:13px;
+            transform: translate(-50%, -50%);
+          ">${(loc.username || '?')[0].toUpperCase()}</div>`;
+        const icon = window.L.divIcon({ html: iconHtml, className: '', iconSize: [32, 32] });
+        const marker = window.L.marker([loc.lat, loc.lng], { icon })
+          .addTo(map)
+          .bindPopup(`<b>${loc.username}</b><br>${loc.updated_ago || 'just now'}${loc.current_job ? `<br>📋 ${loc.current_job}` : ''}`);
+        markersRef.current.push(marker);
+        bounds.push([loc.lat, loc.lng]);
+      });
+
+      if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
+    } catch (e) {
+      setError('Could not load tech locations.');
+    }
+  };
+
+  // Refresh every 30s
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (leafletRef.current) fetchLocs(leafletRef.current);
+    }, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', minHeight: 0 }}>
+      {error && (
+        <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 500, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 14px', color: '#dc2626', fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+      {/* Tech location cards */}
+      {locs.length > 0 && (
+        <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 500, display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 200 }}>
+          {locs.map(loc => (
+            <div key={loc.username} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', fontSize: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+              <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{loc.username}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{loc.updated_ago || 'recently'}</div>
+              {loc.current_job && <div style={{ color: 'var(--blue-600)', fontSize: 11, marginTop: 2 }}>📋 {loc.current_job}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+      {locs.length === 0 && !error && (
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 500, textAlign: 'center', pointerEvents: 'none' }}>
+          <MapPin size={32} color="var(--text-muted)" style={{ opacity: 0.3, marginBottom: 8 }} />
+          <p style={{ color: 'var(--text-muted)', fontSize: 14, fontWeight: 600 }}>No tech locations yet</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Techs share their location from the My Jobs page.</p>
+        </div>
+      )}
+      <div ref={mapRef} style={{ flex: 1, minHeight: 0 }} />
+    </div>
+  );
+}
+
 // ─── Main Dispatch Board ──────────────────────────────────────────────────────
 export default function DispatchBoard() {
   const [date, setDate]           = useState(new Date());
@@ -419,6 +597,7 @@ export default function DispatchBoard() {
   const [showCreate, setShowCreate]   = useState(false);
   const [createDefaults, setCreateDefaults] = useState({});
   const [queueOpen, setQueueOpen] = useState(true);
+  const [viewMode, setViewMode]   = useState('timeline'); // 'timeline' | 'map'
 
   const load = async () => {
     setLoading(true);
@@ -488,13 +667,32 @@ export default function DispatchBoard() {
           <Calendar size={20} /> Dispatch Board
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary btn-sm" onClick={() => shiftDate(-1)}><ChevronLeft size={15} /></button>
-          <span style={{ fontWeight: 600, fontSize: 14, minWidth: 220, textAlign: 'center' }}>
-            {isToday && <span style={{ color: 'var(--blue-600)', marginRight: 6 }}>Today —</span>}
-            {dateLabel}
-          </span>
-          <button className="btn btn-secondary btn-sm" onClick={() => shiftDate(1)}><ChevronRight size={15} /></button>
-          {!isToday && <button className="btn btn-secondary btn-sm" onClick={() => setDate(new Date())}>Today</button>}
+          {/* View toggle */}
+          <div style={{ display: 'flex', background: 'var(--bg-page)', border: '1px solid var(--border)', borderRadius: 7, padding: 2, gap: 2 }}>
+            <button
+              onClick={() => setViewMode('timeline')}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 5, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: viewMode === 'timeline' ? 'var(--blue-600)' : 'transparent', color: viewMode === 'timeline' ? '#fff' : 'var(--text-muted)', transition: 'all .15s' }}
+            >
+              <LayoutTemplate size={13} /> Timeline
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 5, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: viewMode === 'map' ? 'var(--blue-600)' : 'transparent', color: viewMode === 'map' ? '#fff' : 'var(--text-muted)', transition: 'all .15s' }}
+            >
+              <Map size={13} /> Map
+            </button>
+          </div>
+          {viewMode === 'timeline' && (
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => shiftDate(-1)}><ChevronLeft size={15} /></button>
+              <span style={{ fontWeight: 600, fontSize: 14, minWidth: 220, textAlign: 'center' }}>
+                {isToday && <span style={{ color: 'var(--blue-600)', marginRight: 6 }}>Today —</span>}
+                {dateLabel}
+              </span>
+              <button className="btn btn-secondary btn-sm" onClick={() => shiftDate(1)}><ChevronRight size={15} /></button>
+              {!isToday && <button className="btn btn-secondary btn-sm" onClick={() => setDate(new Date())}>Today</button>}
+            </>
+          )}
           <button
             className="btn btn-primary btn-sm"
             onClick={() => { setCreateDefaults({ scheduled_date: dateStr(date) }); setShowCreate(true); }}
@@ -507,6 +705,8 @@ export default function DispatchBoard() {
 
       {loading ? (
         <div className="empty-state"><p className="text-muted">Loading…</p></div>
+      ) : viewMode === 'map' ? (
+        <MapView />
       ) : (
         <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 

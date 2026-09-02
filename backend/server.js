@@ -50,6 +50,7 @@ app.use('/api/pricebook', requireAuth, demoGuard, require('./routes/pricebook'))
 app.use('/api/memberships', requireAuth, demoGuard, require('./routes/memberships'));
 app.use('/api/analytics', requireAuth, require('./routes/analytics'));
 app.use('/api/service-requests', requireAuth, demoGuard, require('./routes/serviceRequests'));
+app.use('/api/sms', requireAuth, demoGuard, require('./routes/sms'));
 app.use('/api/search', requireAuth, require('./routes/search'));
 app.use('/api/mobile', requireAuth, require('./routes/mobile'));
 

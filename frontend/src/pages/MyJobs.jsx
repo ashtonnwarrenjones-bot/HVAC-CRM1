@@ -356,6 +356,39 @@ export default function MyJobs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('active'); // 'active' | 'completed' | 'all'
+  const [locSharing, setLocSharing] = useState(null); // null | 'active' | 'denied'
+
+  // ── Location sharing ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    let intervalId = null;
+    let watchId = null;
+
+    const send = (lat, lng) => {
+      axios.put('/api/mobile/techs/location', { lat, lng }).catch(() => {});
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocSharing('active');
+        send(pos.coords.latitude, pos.coords.longitude);
+        // Keep updating every 60 seconds
+        intervalId = setInterval(() => {
+          navigator.geolocation.getCurrentPosition(
+            (p) => send(p.coords.latitude, p.coords.longitude),
+            () => {}
+          );
+        }, 60000);
+      },
+      () => setLocSharing('denied'),
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -390,11 +423,20 @@ export default function MyJobs() {
     <div style={{ padding: '20px 16px', maxWidth: 640, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 2px' }}>
-          My Jobs
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 2px' }}>
+            My Jobs
+          </h1>
+          {locSharing === 'active' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#16a34a', fontWeight: 600, background: '#dcfce7', padding: '4px 9px', borderRadius: 20, flexShrink: 0 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', display: 'inline-block', animation: 'gps-pulse 2s ease-in-out infinite' }} />
+              Location On
+            </div>
+          )}
+        </div>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>{today}</p>
       </div>
+      <style>{`@keyframes gps-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
 
       {/* Stats bar */}
       {!loading && !error && (
