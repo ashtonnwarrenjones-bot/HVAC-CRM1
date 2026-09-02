@@ -394,6 +394,21 @@ const SCHEMA_STATEMENTS = [
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+
+  // Quote / Service Requests (tech → sales)
+  `CREATE TABLE IF NOT EXISTS service_requests (
+    id SERIAL PRIMARY KEY,
+    job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    submitted_by TEXT,
+    manufacturer TEXT,
+    model TEXT,
+    serial_number TEXT,
+    work_needed TEXT NOT NULL,
+    notes TEXT,
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 
 // ─── Demo data seeder ─────────────────────────────────────────────────────────
@@ -794,6 +809,8 @@ async function initDb() {
     "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lead_source TEXT",
     "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP",
     "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS invoice_created BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token TEXT",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMP",
   ];
 
   for (const sql of columnMigrations) {

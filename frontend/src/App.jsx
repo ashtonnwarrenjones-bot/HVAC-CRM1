@@ -11,11 +11,10 @@ import {
   BookOpen, Shield, Trello
 } from 'lucide-react';
 import Login from './pages/Login';
-import Portal from './pages/Portal';
-import Sign from './pages/Sign';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import MyJobs from './pages/MyJobs';
+import Portal from './pages/Portal';
+import Sign from './pages/Sign';
 import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
 import CompanyDetail from './pages/CompanyDetail';
@@ -31,6 +30,8 @@ import Invoices from './pages/Invoices';
 import DispatchBoard from './pages/DispatchBoard';
 import Pricebook from './pages/Pricebook';
 import Memberships from './pages/Memberships';
+import MyJobs from './pages/MyJobs';
+import ServiceRequests from './pages/ServiceRequests';
 
 const ALL_NAV = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
@@ -41,6 +42,7 @@ const ALL_NAV = [
   { to: '/companies', label: 'Companies', Icon: Building2, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
   { to: '/contacts', label: 'Contacts', Icon: Users, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
   { to: '/proposals', label: 'Proposals', Icon: FileText, roles: ['admin', 'sales_rep', 'demo'] },
+  { to: '/service-requests', label: 'Quote Requests', Icon: FileText, roles: ['admin', 'sales_rep'] },
   { to: '/equipment', label: 'Equipment', Icon: Wrench, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/invoices', label: 'Invoices', Icon: Receipt, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/memberships', label: 'Memberships', Icon: Shield, roles: ['admin', 'dispatcher', 'demo'] },
@@ -456,9 +458,9 @@ function AppLayout() {
       {/* ── Main content ── */}
       <main className="main">
         <Routes>
-          {/* Technicians land on My Jobs by default */}
           <Route path="/" element={role === 'technician' ? <Navigate to="/my-jobs" replace /> : <Dashboard />} />
           <Route path="/my-jobs" element={<MyJobs />} />
+          <Route path="/service-requests" element={<ServiceRequests />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/companies" element={<Companies />} />
@@ -488,12 +490,13 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public pages — no auth required */}
+          {/* Public signing page — no auth required */}
           <Route path="/sign/:token" element={<Sign />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
           {/* Customer portal — has its own auth */}
           <Route path="/portal/*" element={<Portal />} />
+          {/* Password reset flow — public */}
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           {/* All other routes go through the authenticated layout */}
           <Route path="/*" element={<AppLayout />} />
         </Routes>
