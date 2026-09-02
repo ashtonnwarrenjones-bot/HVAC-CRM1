@@ -227,7 +227,7 @@ export default function Settings() {
   );
 
   return (
-    <div data-tour="settings" style={{ display: 'flex', height: '100%', minHeight: 0, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100%', minHeight: 0, overflow: 'hidden' }}>
 
       {/* ── Sidebar nav ── */}
       <div style={{
@@ -235,7 +235,7 @@ export default function Settings() {
         borderRight: '1px solid var(--border)', padding: '20px 12px',
         display: 'flex', flexDirection: 'column', gap: 4,
       }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 8px', marginBottom: 8 }}>
+        <div data-tour="settings" style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 8px', marginBottom: 8 }}>
           Settings
         </div>
         {NAV.map(({ key, label, Icon }) => (
