@@ -226,16 +226,17 @@ export default function GuidedTour({ onClose }) {
     overflow: 'hidden',
   };
 
-  // Always render — never return null — so tour never disappears
-  if (!ready) return null;
+  // Never return null — always keep the tour mounted so state/timers survive
+  // While not ready, render invisible so the popover never flickers away
+  const hidden = !ready;
 
   return (
     <>
       {/* Spotlight box */}
-      <div style={spotStyle} />
+      <div style={hidden ? { display: 'none' } : spotStyle} />
 
       {/* Popover card */}
-      <div style={popoverStyle}>
+      <div style={{ ...popoverStyle, display: hidden ? 'none' : undefined }}>
         {/* Header */}
         <div style={{ background: 'linear-gradient(135deg, #1e40af, #3b82f6)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
