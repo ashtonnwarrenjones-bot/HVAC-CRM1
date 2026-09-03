@@ -497,7 +497,7 @@ export default function Settings() {
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, fontWeight: 600 }}>Scan to open on phone</div>
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>Technician Mobile App</h3>
                   <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
                     Share this QR code or link with your techs. When they scan it, the mobile app opens in their browser — no app store download required. They log in with their CRM username and password.
