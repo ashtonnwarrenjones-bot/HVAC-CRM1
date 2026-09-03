@@ -61,7 +61,7 @@ export default function Settings() {
 
   // Mobile app QR
   const [mobileCopied, setMobileCopied] = useState(false);
-  const mobileUrl = `${window.location.origin}/mobile`;
+  const mobileUrl = 'https://expo.dev/accounts/ashtonnjones/projects/conduit-mobile/builds/99c00f13-63e6-4bd3-8727-6d8b07f7ea3b';
   const copyMobileUrl = () => {
     navigator.clipboard.writeText(mobileUrl).then(() => {
       setMobileCopied(true);
@@ -495,12 +495,16 @@ export default function Settings() {
                       style={{ display: 'block', borderRadius: 4 }}
                     />
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, fontWeight: 600 }}>Scan to open on phone</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, fontWeight: 600 }}>Android — Scan to install</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>Technician Mobile App</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>Technician Mobile App</h3>
+                    <span style={{ background: '#16a34a', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.04em' }}>Android</span>
+                    <span style={{ background: 'var(--bg-page)', color: 'var(--text-muted)', border: '1px solid var(--border)', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.04em' }}>iOS Coming Soon</span>
+                  </div>
                   <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    Share this QR code or link with your techs. When they scan it, the mobile app opens in their browser — no app store download required. They log in with their CRM username and password.
+                    Share this QR code or link with your Android techs. They scan it to download and install the Conduit app directly — no app store required. Log in with their CRM username and password.
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                     <div style={{ flex: 1, background: 'var(--bg-page)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mobileUrl}</div>
@@ -527,7 +531,7 @@ export default function Settings() {
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 22px' }}>
               <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>How to share with your team</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[['1','Screenshot this QR code and text it to your techs, or print it and post it in the shop.'],['2','Techs open their phone camera, scan the QR code, and the app opens instantly.'],['3','They log in with the username and password you set up in the Users tab.'],['4','On iPhone: tap Share → Add to Home Screen. On Android: tap the menu → Add to Home Screen.']].map(([num, text]) => (
+                {[['1','Screenshot this QR code and text it to your Android techs, or share the download link directly.'],['2','Tech opens their phone camera, scans the QR code, and taps the link to download the APK.'],['3','On first install, Android may ask to allow installs from this source — tap Allow.'],['4','They log in with the username and password you set up in the Users tab. iOS coming soon.']].map(([num, text]) => (
                   <div key={num} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                     <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#1e40af', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0, marginTop: 1 }}>{num}</div>
                     <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{text}</p>
