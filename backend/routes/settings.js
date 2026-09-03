@@ -51,15 +51,30 @@ router.put('/', async (req, res) => {
 // GET /api/settings/backup — full data export as downloadable JSON
 router.get('/backup', async (req, res) => {
   try {
+    const settingsRows = await db.prepare('SELECT key, value FROM settings').all();
+    const settingsObj = { ...DEFAULTS };
+    settingsRows.forEach(r => { settingsObj[r.key] = r.value; });
+
+    const vendors = await db.prepare('SELECT * FROM vendors WHERE active = TRUE ORDER BY name').all();
+    const vendorBrands = await db.prepare('SELECT * FROM vendor_brands ORDER BY vendor_id, brand').all();
+    const vendorParts = await db.prepare('SELECT * FROM vendor_parts ORDER BY vendor_id, description').all();
+
     const backup = {
       exported_at: new Date().toISOString(),
-      version: '1.0',
+      version: '2.0',
+      settings:            settingsObj,
+      vendors,
+      vendor_brands:       vendorBrands,
+      vendor_parts:        vendorParts,
       companies:           await db.prepare('SELECT * FROM companies ORDER BY name').all(),
       contacts:            await db.prepare('SELECT * FROM contacts ORDER BY last_name, first_name').all(),
       proposals:           await db.prepare('SELECT * FROM proposals ORDER BY created_at DESC').all(),
       proposal_line_items: await db.prepare('SELECT * FROM proposal_line_items').all(),
       jobs:                await db.prepare('SELECT * FROM jobs ORDER BY created_at DESC').all(),
       deals:               await db.prepare('SELECT * FROM deals ORDER BY created_at DESC').all(),
+      pricebook_items:     await db.prepare('SELECT * FROM pricebook_items WHERE is_active = TRUE ORDER BY category, name').all(),
+      memberships:         await db.prepare('SELECT * FROM memberships ORDER BY created_at DESC').all(),
+      invoices:            await db.prepare('SELECT * FROM invoices ORDER BY created_at DESC').all(),
     };
     const filename = `conduit-backup-${new Date().toISOString().slice(0, 10)}.json`;
     res.setHeader('Content-Type', 'application/json');

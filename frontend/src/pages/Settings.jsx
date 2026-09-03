@@ -3,7 +3,7 @@ import axios from 'axios';
 import SalesforceImport from '../components/SalesforceImport';
 import {
   Building2, FileText, Users, Database, Info,
-  Phone, Check, AlertCircle, Link2,
+  Phone, Check, AlertCircle, Link2, Smartphone, Copy, ExternalLink,
 } from 'lucide-react';
 
 const DEFAULTS = {
@@ -33,12 +33,13 @@ const CARRIERS = [
 ];
 
 const NAV = [
-  { key: 'company',     label: 'Company Info',     Icon: Building2 },
-  { key: 'proposal',    label: 'Proposal',          Icon: FileText  },
-  { key: 'users',       label: 'Users',             Icon: Users     },
-  { key: 'integrations',label: 'Integrations',      Icon: Link2     },
-  { key: 'data',        label: 'Data',              Icon: Database  },
-  { key: 'about',       label: 'About',             Icon: Info      },
+  { key: 'company',     label: 'Company Info',     Icon: Building2  },
+  { key: 'proposal',    label: 'Proposal',          Icon: FileText   },
+  { key: 'users',       label: 'Users',             Icon: Users      },
+  { key: 'mobile',      label: 'Mobile App',        Icon: Smartphone },
+  { key: 'integrations',label: 'Integrations',      Icon: Link2      },
+  { key: 'data',        label: 'Data',              Icon: Database   },
+  { key: 'about',       label: 'About',             Icon: Info       },
 ];
 
 export default function Settings() {
@@ -57,6 +58,16 @@ export default function Settings() {
   const [userMsg, setUserMsg] = useState(null);
   const [creatingUser, setCreatingUser] = useState(false);
   const [editingPhone, setEditingPhone] = useState({});
+
+  // Mobile app QR
+  const [mobileCopied, setMobileCopied] = useState(false);
+  const mobileUrl = `${window.location.origin}/mobile`;
+  const copyMobileUrl = () => {
+    navigator.clipboard.writeText(mobileUrl).then(() => {
+      setMobileCopied(true);
+      setTimeout(() => setMobileCopied(false), 2000);
+    });
+  };
 
   // ComputerEase integration
   const [ceForm, setCeForm] = useState({ server:'', port:'1433', database:'', username:'', password:'', laborCostCode:'001', materialCostCode:'002', defaultLaborRate:'', enabled: false });
@@ -466,6 +477,64 @@ export default function Settings() {
             <button className="btn btn-primary" onClick={createUser} disabled={creatingUser} style={{ width: '100%' }}>
               {creatingUser ? '⏳ Creating...' : '+ Create User'}
             </button>
+          </>
+        )}
+
+        {/* ── Mobile App ── */}
+        {tab === 'mobile' && (
+          <>
+            {sectionTitle('Mobile App', 'Give technicians access to jobs, check-in, and dispatch from their phone.')}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', marginBottom: 20 }}>
+              <div style={{ padding: '22px 24px', display: 'flex', gap: 32, alignItems: 'flex-start' }}>
+                <div style={{ flexShrink: 0, textAlign: 'center' }}>
+                  <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 10, padding: 12, display: 'inline-block' }}>
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=0&data=${encodeURIComponent(mobileUrl)}`}
+                      alt="Mobile app QR code"
+                      width={180} height={180}
+                      style={{ display: 'block', borderRadius: 4 }}
+                    />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, fontWeight: 600 }}>Scan to open on phone</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>Technician Mobile App</h3>
+                  <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    Share this QR code or link with your techs. When they scan it, the mobile app opens in their browser — no app store download required. They log in with their CRM username and password.
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+                    <div style={{ flex: 1, background: 'var(--bg-page)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mobileUrl}</div>
+                    <button onClick={copyMobileUrl} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 8, border: '1px solid var(--border)', background: mobileCopied ? '#dcfce7' : 'var(--bg-card)', color: mobileCopied ? '#166534' : 'var(--text-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all .2s' }}>
+                      {mobileCopied ? <Check size={14} /> : <Copy size={14} />}
+                      {mobileCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                    <a href={mobileUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'none' }}>
+                      <ExternalLink size={14} /> Open
+                    </a>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                    {[['📋','View assigned jobs'],['✅','Check in / check out GPS'],['📝','Add job notes & photos'],['🔩','Log parts used'],['⏱️','Track time on job'],['🔧','View service history']].map(([icon, text]) => (
+                      <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-secondary)' }}><span>{icon}</span> {text}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: '12px 24px', background: '#eff6ff', borderTop: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#1e40af' }}>
+                <Smartphone size={15} />
+                <span>Works on any smartphone browser — iPhone Safari or Android Chrome. No installation needed. Add to Home Screen for an app-like experience.</span>
+              </div>
+            </div>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 22px' }}>
+              <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>How to share with your team</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[['1','Screenshot this QR code and text it to your techs, or print it and post it in the shop.'],['2','Techs open their phone camera, scan the QR code, and the app opens instantly.'],['3','They log in with the username and password you set up in the Users tab.'],['4','On iPhone: tap Share → Add to Home Screen. On Android: tap the menu → Add to Home Screen.']].map(([num, text]) => (
+                  <div key={num} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#1e40af', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0, marginTop: 1 }}>{num}</div>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </>
         )}
 
