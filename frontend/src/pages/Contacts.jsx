@@ -70,56 +70,97 @@ export default function Contacts() {
             <span className="text-muted text-sm">{contacts.length} contact{contacts.length !== 1 ? 's' : ''}</span>
           </div>
 
-          <div className="table-wrap">
-            {contacts.length === 0 ? (
-              <div className="empty-state">
-                <div className="icon">👤</div>
-                <p>No contacts yet.</p>
-                <button className="btn btn-primary mt-2" onClick={openAdd}>Add First Contact</button>
-              </div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Company</th>
-                    <th>Title</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Preferred</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {contacts.map(c => (
-                    <tr key={c.id}>
-                      <td>
-                        <span className="font-bold">{c.first_name} {c.last_name}</span>
-                        {c.is_primary ? <span className="badge badge-blue" style={{ marginLeft: 6 }}>Primary</span> : null}
-                      </td>
-                      <td>
-                        {c.company_id ? (
-                          <Link to={`/companies/${c.company_id}`} className="link-style">{c.company_name}</Link>
-                        ) : <span className="text-muted">—</span>}
-                      </td>
-                      <td className="text-muted">{c.title || '—'}</td>
-                      <td>{c.email ? <a href={`mailto:${c.email}`} className="link-style">{c.email}</a> : '—'}</td>
-                      <td className="text-muted">{c.phone || c.mobile || '—'}</td>
-                      <td>
-                        <span className="badge badge-gray">{c.preferred_contact}</span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn btn-secondary btn-sm" onClick={() => openEdit(c)}>Edit</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => del(c.id, `${c.first_name} ${c.last_name}`)}>Delete</button>
-                        </div>
-                      </td>
+          {contacts.length === 0 ? (
+            <div className="empty-state">
+              <div className="icon">👤</div>
+              <p>No contacts yet.</p>
+              <button className="btn btn-primary mt-2" onClick={openAdd}>Add First Contact</button>
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="table-wrap hide-on-mobile">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Company</th>
+                      <th>Title</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Preferred</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                  </thead>
+                  <tbody>
+                    {contacts.map(c => (
+                      <tr key={c.id}>
+                        <td>
+                          <span className="font-bold">{c.first_name} {c.last_name}</span>
+                          {c.is_primary ? <span className="badge badge-blue" style={{ marginLeft: 6 }}>Primary</span> : null}
+                        </td>
+                        <td>
+                          {c.company_id ? (
+                            <Link to={`/companies/${c.company_id}`} className="link-style">{c.company_name}</Link>
+                          ) : <span className="text-muted">—</span>}
+                        </td>
+                        <td className="text-muted">{c.title || '—'}</td>
+                        <td>{c.email ? <a href={`mailto:${c.email}`} className="link-style">{c.email}</a> : '—'}</td>
+                        <td className="text-muted">{c.phone || c.mobile || '—'}</td>
+                        <td><span className="badge badge-gray">{c.preferred_contact}</span></td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => openEdit(c)}>Edit</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => del(c.id, `${c.first_name} ${c.last_name}`)}>Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile card list */}
+              <div className="mobile-card-list show-on-mobile">
+                {contacts.map(c => (
+                  <div key={c.id} style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          {c.first_name} {c.last_name}
+                          {c.is_primary && <span className="badge badge-blue">Primary</span>}
+                        </div>
+                        {c.title && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{c.title}</div>}
+                        {c.company_id && (
+                          <div style={{ marginTop: 4 }}>
+                            <Link to={`/companies/${c.company_id}`} style={{ fontSize: 13, color: 'var(--blue-600)', textDecoration: 'none', fontWeight: 500 }}>
+                              🏢 {c.company_name}
+                            </Link>
+                          </div>
+                        )}
+                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {c.email && (
+                            <a href={`mailto:${c.email}`} style={{ fontSize: 14, color: 'var(--blue-600)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              ✉️ {c.email}
+                            </a>
+                          )}
+                          {(c.phone || c.mobile) && (
+                            <a href={`tel:${c.phone || c.mobile}`} style={{ fontSize: 14, color: 'var(--text-primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              📞 {c.phone || c.mobile}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => openEdit(c)}>Edit</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => del(c.id, `${c.first_name} ${c.last_name}`)} style={{ justifyContent: 'center' }}>Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
