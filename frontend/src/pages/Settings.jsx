@@ -61,7 +61,7 @@ export default function Settings() {
 
   // Mobile app QR
   const [mobileCopied, setMobileCopied] = useState(false);
-  const mobileUrl = 'https://expo.dev/accounts/ashtonnjones/projects/conduit-mobile/builds/99c00f13-63e6-4bd3-8727-6d8b07f7ea3b';
+  const mobileUrl = 'https://expo.dev/accounts/ashtonnjones/projects/conduit-mobile/builds/3bab0cbf-cf04-4e89-8a78-dcaaf6a1724f';
   const copyMobileUrl = () => {
     navigator.clipboard.writeText(mobileUrl).then(() => {
       setMobileCopied(true);
