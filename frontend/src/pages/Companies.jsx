@@ -87,59 +87,96 @@ export default function Companies() {
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
-            <select className="form-control" style={{ width: 200 }} value={filter} onChange={e => setFilter(e.target.value)}>
+            <select className="form-control" value={filter} onChange={e => setFilter(e.target.value)}>
               <option value="">All Contract Types</option>
               {CONTRACT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             <span className="text-muted text-sm">{filtered.length} account{filtered.length !== 1 ? 's' : ''}</span>
           </div>
 
-          <div className="table-wrap">
-            {loading ? (
-              <div style={{ padding: 32, textAlign: 'center', color: 'var(--gray-500)' }}>Loading...</div>
-            ) : filtered.length === 0 ? (
-              <div className="empty-state">
-                <div className="icon">🏢</div>
-                <p>No companies yet.</p>
-                <button className="btn btn-primary mt-2" onClick={openAdd}>Add Your First Company</button>
-              </div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Company</th>
-                    <th>Location</th>
-                    <th>Property Type</th>
-                    <th>Contract</th>
-                    <th>Contacts</th>
-                    <th>Proposals</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(c => (
-                    <tr key={c.id}>
-                      <td>
-                        <Link to={`/companies/${c.id}`} className="link-style font-bold">{c.name}</Link>
-                        {c.phone && <div className="text-sm text-muted">{c.phone}</div>}
-                      </td>
-                      <td className="text-muted">{[c.city, c.state].filter(Boolean).join(', ')}</td>
-                      <td className="text-muted" style={{ textTransform: 'capitalize' }}>{c.property_type}</td>
-                      <td><span className={`badge ${CONTRACT_COLORS[c.contract_type] || 'badge-gray'}`}>{(c.contract_type || '').replace(/_/g, ' ')}</span></td>
-                      <td className="text-muted">{c.contact_count}</td>
-                      <td className="text-muted">{c.proposal_count}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn btn-secondary btn-sm" onClick={() => openEdit(c)}>Edit</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => del(c.id, c.name)}>Delete</button>
-                        </div>
-                      </td>
+          {loading ? (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--gray-500)' }}>Loading...</div>
+          ) : filtered.length === 0 ? (
+            <div className="empty-state">
+              <div className="icon">🏢</div>
+              <p>No companies yet.</p>
+              <button className="btn btn-primary mt-2" onClick={openAdd}>Add Your First Company</button>
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="table-wrap hide-on-mobile">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Company</th>
+                      <th>Location</th>
+                      <th>Property Type</th>
+                      <th>Contract</th>
+                      <th>Contacts</th>
+                      <th>Proposals</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map(c => (
+                      <tr key={c.id}>
+                        <td>
+                          <Link to={`/companies/${c.id}`} className="link-style font-bold">{c.name}</Link>
+                          {c.phone && <div className="text-sm text-muted">{c.phone}</div>}
+                        </td>
+                        <td className="text-muted">{[c.city, c.state].filter(Boolean).join(', ')}</td>
+                        <td className="text-muted" style={{ textTransform: 'capitalize' }}>{c.property_type}</td>
+                        <td><span className={`badge ${CONTRACT_COLORS[c.contract_type] || 'badge-gray'}`}>{(c.contract_type || '').replace(/_/g, ' ')}</span></td>
+                        <td className="text-muted">{c.contact_count}</td>
+                        <td className="text-muted">{c.proposal_count}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => openEdit(c)}>Edit</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => del(c.id, c.name)}>Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile card list */}
+              <div className="mobile-card-list show-on-mobile">
+                {filtered.map(c => (
+                  <div key={c.id} style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Link to={`/companies/${c.id}`} style={{ fontWeight: 700, fontSize: 16, color: 'var(--blue-600)', textDecoration: 'none' }}>
+                          {c.name}
+                        </Link>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6, alignItems: 'center' }}>
+                          <span className={`badge ${CONTRACT_COLORS[c.contract_type] || 'badge-gray'}`}>
+                            {(c.contract_type || '').replace(/_/g, ' ')}
+                          </span>
+                          {c.property_type && (
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{c.property_type}</span>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: 13, color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                          {(c.city || c.state) && <span>📍 {[c.city, c.state].filter(Boolean).join(', ')}</span>}
+                          {c.phone && <span>📞 {c.phone}</span>}
+                          {c.contact_count > 0 && <span>👤 {c.contact_count} contact{c.contact_count !== 1 ? 's' : ''}</span>}
+                          {c.proposal_count > 0 && <span>📄 {c.proposal_count} proposal{c.proposal_count !== 1 ? 's' : ''}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <Link to={`/companies/${c.id}`} className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>View</Link>
+                      <button className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => openEdit(c)}>Edit</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => del(c.id, c.name)} style={{ justifyContent: 'center' }}>Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
