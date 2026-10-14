@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, Search, Plus, X, Tag } from 'lucide-react';
@@ -387,53 +387,86 @@ export default function Proposals() {
               Pipeline: {fmt(proposals.filter(p => ['draft','sent'].includes(p.status)).reduce((s, p) => s + (p.total_amount || 0), 0))}
             </span>
           </div>
-          <div className="table-wrap">
-            {proposals.length === 0 ? (
-              <div className="empty-state">
-                <div className="icon">📋</div>
-                <p>No proposals yet.</p>
-                <button className="btn btn-primary mt-2" onClick={() => setShowModal(true)}>Create First Proposal</button>
-              </div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Proposal #</th>
-                    <th>Title</th>
-                    <th>Company</th>
-                    <th>Contact</th>
-                    <th>Service Type</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th>Date</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {proposals.map(p => (
-                    <tr key={p.id}>
-                      <td className="text-muted text-sm">{p.proposal_number}</td>
-                      <td><Link to={`/proposals/${p.id}`} className="link-style font-bold">{p.title}</Link></td>
-                      <td>{p.company_name ? <Link to={`/companies/${p.company_id}`} className="link-style">{p.company_name}</Link> : '—'}</td>
-                      <td className="text-muted">{p.first_name ? `${p.first_name} ${p.last_name}` : '—'}</td>
-                      <td className="text-muted">{p.service_type || '—'}</td>
-                      <td className="font-bold">{fmt(p.total_amount)}</td>
-                      <td><span className={`badge ${STATUS_COLORS[p.status] || 'badge-gray'}`}>{p.status}</span></td>
-                      <td className="text-muted">{new Date(p.created_at).toLocaleDateString()}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <Link to={`/proposals/${p.id}`} className="btn btn-secondary btn-sm">View</Link>
-                          <button className="btn btn-secondary btn-sm" onClick={() => openEdit(p)}>Edit</button>
-                          <a href={`/api/proposals/${p.id}/pdf`} className="btn btn-secondary btn-sm" target="_blank" rel="noreferrer">PDF</a>
-                          <button className="btn btn-danger btn-sm" onClick={() => del(p.id)}>Del</button>
-                        </div>
-                      </td>
+          {proposals.length === 0 ? (
+            <div className="empty-state">
+              <div className="icon">📋</div>
+              <p>No proposals yet.</p>
+              <button className="btn btn-primary mt-2" onClick={() => setShowModal(true)}>Create First Proposal</button>
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="table-wrap hide-on-mobile">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Proposal #</th>
+                      <th>Title</th>
+                      <th>Company</th>
+                      <th>Contact</th>
+                      <th>Service Type</th>
+                      <th>Total</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                  </thead>
+                  <tbody>
+                    {proposals.map(p => (
+                      <tr key={p.id}>
+                        <td className="text-muted text-sm">{p.proposal_number}</td>
+                        <td><Link to={`/proposals/${p.id}`} className="link-style font-bold">{p.title}</Link></td>
+                        <td>{p.company_name ? <Link to={`/companies/${p.company_id}`} className="link-style">{p.company_name}</Link> : '—'}</td>
+                        <td className="text-muted">{p.first_name ? `${p.first_name} ${p.last_name}` : '—'}</td>
+                        <td className="text-muted">{p.service_type || '—'}</td>
+                        <td className="font-bold">{fmt(p.total_amount)}</td>
+                        <td><span className={`badge ${STATUS_COLORS[p.status] || 'badge-gray'}`}>{p.status}</span></td>
+                        <td className="text-muted">{new Date(p.created_at).toLocaleDateString()}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <Link to={`/proposals/${p.id}`} className="btn btn-secondary btn-sm">View</Link>
+                            <button className="btn btn-secondary btn-sm" onClick={() => openEdit(p)}>Edit</button>
+                            <a href={`/api/proposals/${p.id}/pdf`} className="btn btn-secondary btn-sm" target="_blank" rel="noreferrer">PDF</a>
+                            <button className="btn btn-danger btn-sm" onClick={() => del(p.id)}>Del</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile card list */}
+              <div className="mobile-card-list show-on-mobile">
+                {proposals.map(p => (
+                  <div key={p.id} style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Link to={`/proposals/${p.id}`} style={{ fontWeight: 700, fontSize: 16, color: 'var(--blue-600)', textDecoration: 'none' }}>
+                          {p.title}
+                        </Link>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{p.proposal_number}</div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span className={`badge ${STATUS_COLORS[p.status] || 'badge-gray'}`}>{p.status}</span>
+                          <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>{fmt(p.total_amount)}</span>
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: 13, color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                          {p.company_name && <span>🏢 {p.company_name}</span>}
+                          {p.service_type && <span>🔧 {p.service_type}</span>}
+                          <span>📅 {new Date(p.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <Link to={`/proposals/${p.id}`} className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>View</Link>
+                      <button className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => openEdit(p)}>Edit</button>
+                      <a href={`/api/proposals/${p.id}/pdf`} className="btn btn-secondary btn-sm" target="_blank" rel="noreferrer" style={{ justifyContent: 'center' }}>PDF</a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
