@@ -13,15 +13,15 @@ const STAGES = [
 ];
 
 const SERVICE_TYPES = [
-  'Preventive Maintenance', 'Emergency Repair', 'HVAC Replacement',
-  'Plumbing Repair', 'Plumbing Installation', 'Duct Cleaning',
-  'Refrigerant Service', 'Boiler Service', 'Chiller Service',
-  'Controls / BAS', 'New Installation', 'Other'
+  'Landscape Maintenance', 'Snow Removal', 'Pressure Washing',
+  'Window Washing', 'Asphalt / Crack Sealing', 'Parking Lot Striping',
+  'Concrete Work', 'Day Porter', 'Handyman',
+  'Janitorial', 'New Contract', 'Other'
 ];
 
 const EMPTY = {
   title: '', company_id: '', contact_id: '', stage: 'lead',
-  value: '', probability: '10', service_type: 'Preventive Maintenance',
+  value: '', probability: '10', service_type: 'Landscape Maintenance',
   close_date: '', notes: ''
 };
 
