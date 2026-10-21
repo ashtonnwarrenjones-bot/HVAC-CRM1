@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Conduit logo component.
+ * Mahalo Pro logo component.
  *
  * Props:
  *   size        — icon height in px (default 36)
@@ -9,7 +9,7 @@ import React from 'react';
  *                   color : gradient badge + white rails + blue nodes
  *                   white : frosted/transparent badge + white rails + blue nodes (on dark header)
  *                   ghost : icon only, transparent bg (rare use)
- *   showWordmark — show "Conduit" text beside icon (default true)
+ *   showWordmark — show "Mahalo Pro" text beside icon (default true)
  *   subtitle    — optional sub-label beneath wordmark (e.g. "Field Service CRM")
  *   wordmarkColor — CSS color for the wordmark text (default auto based on variant)
  */
@@ -25,7 +25,7 @@ export default function Logo({
   // Badge fill
   const badgeFill = variant === 'white'
     ? 'rgba(255,255,255,0.12)'
-    : 'url(#conduit-grad)';
+    : 'url(#Mahalo Pro-grad)';
 
   // Rail/arc stroke color
   const strokeColor = '#ffffff';
@@ -66,7 +66,7 @@ export default function Logo({
       >
         <defs>
           <linearGradient
-            id="conduit-grad"
+            id="Mahalo Pro-grad"
             x1="0" y1="0" x2="40" y2="40"
             gradientUnits="userSpaceOnUse"
           >
@@ -116,7 +116,7 @@ export default function Logo({
             color: wc,
             lineHeight: 1.1,
           }}>
-            Conduit
+            Mahalo Pro
           </span>
           {subtitle && (
             <span style={{
