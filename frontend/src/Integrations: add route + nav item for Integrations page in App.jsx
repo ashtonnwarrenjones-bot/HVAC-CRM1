@@ -35,6 +35,7 @@ import ServiceRequests from './pages/ServiceRequests';
 import JobReport from './pages/JobReport';
 import Vendors from './pages/Vendors';
 import GuidedTour, { TourLaunchButton } from './components/GuidedTour';
+import Integrations from './pages/Integrations';
 
 const ALL_NAV = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
@@ -50,6 +51,7 @@ const ALL_NAV = [
   { to: '/memberships', label: 'Memberships', Icon: Shield, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/pricebook', label: 'Pricebook', Icon: BookOpen, roles: ['admin', 'demo'] },
   { to: '/vendors', label: 'Vendors', Icon: Truck, roles: ['admin', 'dispatcher'] },
+  { to: '/integrations', label: 'Integrations', Icon: Settings, roles: ['admin'] },
   { to: '/analytics', label: 'Analytics', Icon: BarChart2, roles: ['admin', 'sales_rep', 'demo'] },
 ];
 
@@ -497,6 +499,7 @@ function AppLayout() {
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/vendors" element={<Vendors />} />
+          <Route path="/integrations" element={<Integrations />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/job-report/:id" element={<JobReport />} />
           <Route path="*" element={<Navigate to={role === 'technician' ? '/my-jobs' : '/'} replace />} />
