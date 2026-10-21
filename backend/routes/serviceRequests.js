@@ -61,8 +61,8 @@ router.post('/', async (req, res) => {
       try {
         const { Resend } = require('resend');
         const resend = new Resend(process.env.RESEND_API_KEY);
-        const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@circuitcrm.com';
-        const appUrl = process.env.APP_URL || 'https://circuitcrm.onrender.com';
+        const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@mahalpro.com';
+        const appUrl = process.env.APP_URL || 'https://mahalpro.onrender.com';
 
         const emailHtml = `
           <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
