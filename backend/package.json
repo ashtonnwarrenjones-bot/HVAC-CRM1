@@ -1,7 +1,7 @@
 {
-  "name": "hvac-crm-backend",
+  "name": "mahalo-pro-backend",
   "version": "1.0.0",
-  "description": "HVAC & Plumbing CRM Backend",
+  "description": "Mahalo Pro Facility Services CRM Backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
