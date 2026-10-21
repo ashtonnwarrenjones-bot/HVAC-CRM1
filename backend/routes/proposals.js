@@ -266,7 +266,7 @@ router.get('/:id/pdf', async (req, res) => {
   doc.fill('white').fontSize(22).font('Helvetica-Bold')
     .text('SERVICE PROPOSAL', 50, 30);
   doc.fontSize(10).font('Helvetica')
-    .text('Commercial HVAC & Plumbing Services', 50, 58)
+    .text('Mahalo Pro Facility Services', 50, 58)
     .text(`${settings.company_name} | ${settings.company_phone} | ${settings.company_email}`, 50, 72);
   doc.fill(darkText);
 
