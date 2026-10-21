@@ -17,7 +17,10 @@ const proposalsRouter = require('./routes/proposals');
 app.get('/api/proposals/sign/:token', (req, res, next) => proposalsRouter(req, res, next));
 app.post('/api/proposals/sign/:token', (req, res, next) => proposalsRouter(req, res, next));
 
-// Public portal auth (magic link verification) — must be before portal middleware
+// Public QB OAuth callback + webhook (called by Intuit — no JWT)
+const qbRouter = require('./routes/quickbooks');
+app.get('/api/quickbooks/callback', (req, res, next) => qbRouter(req, res, next));
+app.post('/api/quickbooks/webhook', (req, res, next) => qbRouter(req, res, next));
 const portalRouter = require('./routes/portal');
 app.get('/api/portal/auth/:token', (req, res, next) => portalRouter(req, res, next));
 
@@ -55,6 +58,8 @@ app.use('/api/search', requireAuth, require('./routes/search'));
 app.use('/api/mobile', requireAuth, require('./routes/mobile'));
 app.use('/api/integrations', requireAuth, demoGuard, require('./routes/integrations'));
 app.use('/api/vendors', requireAuth, demoGuard, require('./routes/vendors'));
+app.use('/api/quickbooks', requireAuth, demoGuard, qbRouter);
+app.use('/api/divvy', requireAuth, demoGuard, require('./routes/divvy'));
 
 // Portal admin routes (admin JWT required)
 app.use('/api/portal/admin', requireAuth, demoGuard, portalRouter);
