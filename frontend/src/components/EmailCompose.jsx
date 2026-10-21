@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 
-// Pre-built email templates for HVAC/Plumbing sales
+// Pre-built email templates for Facility Services sales
 const TEMPLATES = [
   {
     key: 'intro',
     label: 'Introduction',
-    subject: 'Commercial HVAC & Plumbing Services — Introduction',
+    subject: 'Mahalo Pro Facility Services — Introduction',
     body: (ctx) =>
 `Hi ${ctx.contactName || 'there'},
 
-My name is [Your Name] with [Your Company], and I specialize in commercial HVAC and plumbing service for businesses like ${ctx.companyName || 'yours'}.
+My name is [Your Name] with [Your Company], and I specialize in facility services for businesses like ${ctx.companyName || 'yours'}.
 
-We work with property managers and facility teams throughout the area to keep systems running reliably — whether that's a comprehensive maintenance program, an emergency repair, or planning ahead for equipment replacements.
+We work with property managers and facility teams throughout the area to keep your property looking its best — whether that's recurring maintenance, snow removal, pressure washing, or a one-time project.
 
 I'd love to learn more about your building and see if there's a fit. Would you be open to a quick 10-minute call this week?
 
@@ -30,7 +30,7 @@ Best regards,
 Thanks for your interest in our services! To put together an accurate proposal for ${ctx.companyName || 'your facility'}, I'd like to schedule a brief site walk-through.
 
 During the visit I'll:
-• Review your existing HVAC/plumbing equipment
+• Review your existing Facility Services equipment
 • Note any areas of concern or deferred maintenance
 • Understand your service history and priorities
 
