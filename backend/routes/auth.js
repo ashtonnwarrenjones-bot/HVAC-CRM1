@@ -9,7 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'hvac-crm-secret-2024';
 // Check if setup is needed (no users exist yet)
 router.get('/status', async (req, res) => {
   try {
-    const existing = await db.prepare('SELECT id FROM users LIMIT 1').get();
+    const existing = await db.prepare('SELECT id FROM users WHERE role != 'demo' LIMIT 1').get();h
     res.json({ needsSetup: !existing });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -19,7 +19,7 @@ router.get('/status', async (req, res) => {
 // First-time setup — create the admin account
 router.post('/setup', async (req, res) => {
   try {
-    const existing = await db.prepare('SELECT id FROM users LIMIT 1').get();
+    const existing = await db.prepare('SELECT id FROM users WHERE role != 'demo' LIMIT 1').get();
     if (existing) return res.status(400).json({ error: 'Admin account already exists' });
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
