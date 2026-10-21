@@ -479,6 +479,29 @@ const SCHEMA_STATEMENTS = [
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     notes TEXT
   )`,
+
+  `CREATE TABLE IF NOT EXISTS qb_mappings (
+    id SERIAL PRIMARY KEY,
+    entity_type TEXT NOT NULL,
+    crm_id INTEGER NOT NULL,
+    qb_id TEXT NOT NULL,
+    synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(entity_type, crm_id)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS deal_expenses (
+    id SERIAL PRIMARY KEY,
+    deal_id INTEGER REFERENCES deals(id) ON DELETE CASCADE,
+    source TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    amount DECIMAL(10,2),
+    description TEXT,
+    category TEXT,
+    merchant TEXT,
+    transaction_date DATE,
+    synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(source, external_id)
+  )`,
 ];
 
 // ─── Demo data seeder ─────────────────────────────────────────────────────────
@@ -890,6 +913,7 @@ async function initDb() {
     "ALTER TABLE pricebook_items ADD COLUMN IF NOT EXISTS vendor_id INTEGER REFERENCES vendors(id) ON DELETE SET NULL",
     "ALTER TABLE pricebook_items ADD COLUMN IF NOT EXISTS vendor_part_number TEXT",
     "ALTER TABLE pricebook_items ADD COLUMN IF NOT EXISTS vendor_cost DECIMAL(10,2)",
+    "ALTER TABLE deals ADD COLUMN IF NOT EXISTS budget DECIMAL(10,2)",
   ];
 
   for (const sql of columnMigrations) {
