@@ -353,7 +353,7 @@ export default function CompanyDetail() {
                     ['Phone', company.phone],
                     ['Website', company.website],
                     ['Address', [company.address, company.city, company.state, company.zip].filter(Boolean).join(', ')],
-                    ['HVAC Units', company.num_hvac_units],
+                    ['Service Locations', company.num_hvac_units],
                     ['Plumbing Fixtures', company.num_plumbing_fixtures],
                     ['Est. Annual Revenue', company.annual_revenue ? fmt(company.annual_revenue) : null],
                   ].map(([label, val]) => val ? (
