@@ -236,7 +236,7 @@ export default function Companies() {
               </div>
               <div className="form-grid-3">
                 <div className="form-group">
-                  <label className="form-label">HVAC Units</label>
+                  <label className="form-label">Service Locations</label>
                   <input className="form-control" type="number" value={form.num_hvac_units} onChange={f('num_hvac_units')} placeholder="0" />
                 </div>
                 <div className="form-group">
