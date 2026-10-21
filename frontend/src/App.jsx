@@ -51,7 +51,7 @@ const ALL_NAV = [
   { to: '/memberships', label: 'Memberships', Icon: Shield, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/pricebook', label: 'Pricebook', Icon: BookOpen, roles: ['admin', 'demo'] },
   { to: '/vendors', label: 'Vendors', Icon: Truck, roles: ['admin', 'dispatcher'] },
-  { to: '/integrations', label: 'Integrations', Icon: Settings, roles: ['admin'] },
+  { to: '/integrations', label: 'Integrations', Icon: SettingsIcon, roles: ['admin'] },
   { to: '/analytics', label: 'Analytics', Icon: BarChart2, roles: ['admin', 'sales_rep', 'demo'] },
 ];
 
