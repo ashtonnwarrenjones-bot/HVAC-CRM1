@@ -253,4 +253,260 @@ router.post(
   }
 );
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/import/parse
+// Upload a single CSV, return headers + first-5-row preview. No DB writes.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/parse', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const rows = parseCSV(req.file.buffer);
+    if (!rows.length) return res.status(400).json({ error: 'CSV appears empty or has no data rows' });
+    const headers = Object.keys(rows[0]);
+    res.json({ headers, preview: rows.slice(0, 5), total: rows.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LMN helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function g(row, mapping, field) {
+  const col = mapping[field];
+  return col ? (row[col] || '').trim() : '';
+}
+
+async function getOrCreateCompany(db, name, companyMap) {
+  if (!name) return null;
+  const key = name.toLowerCase();
+  if (companyMap[key]) return companyMap[key];
+  const existing = await db.prepare('SELECT id FROM companies WHERE LOWER(name) = LOWER(?)').get(name);
+  if (existing) { companyMap[key] = existing.id; return existing.id; }
+  const r = await db.prepare('INSERT INTO companies (name) VALUES (?)').run(name);
+  const id = r.lastInsertRowid || r.rows?.[0]?.id;
+  companyMap[key] = id;
+  return id;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/import/lmn/companies
+// body: { rows:[{...}], mapping:{ name:'Customer Name', phone:'Phone', ... } }
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/lmn/companies', async (req, res) => {
+  const { rows = [], mapping = {} } = req.body;
+  const summary = { created: 0, skipped: 0, errors: [] };
+
+  for (const row of rows) {
+    const name = g(row, mapping, 'name');
+    if (!name) continue;
+
+    const existing = await db.prepare('SELECT id FROM companies WHERE LOWER(name) = LOWER(?)').get(name);
+    if (existing) { summary.skipped++; continue; }
+
+    try {
+      await db.prepare(`
+        INSERT INTO companies (name, phone, website, address, city, state, zip, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        name,
+        g(row, mapping, 'phone')   || null,
+        g(row, mapping, 'website') || null,
+        g(row, mapping, 'address') || null,
+        g(row, mapping, 'city')    || null,
+        g(row, mapping, 'state')   || null,
+        g(row, mapping, 'zip')     || null,
+        g(row, mapping, 'notes')   || null,
+      );
+      summary.created++;
+    } catch (e) {
+      summary.errors.push(`"${name}": ${e.message}`);
+    }
+  }
+
+  res.json(summary);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/import/lmn/contacts
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/lmn/contacts', async (req, res) => {
+  const { rows = [], mapping = {} } = req.body;
+  const summary = { created: 0, skipped: 0, errors: [] };
+
+  const companyMap = {};
+  const companies = await db.prepare('SELECT id, LOWER(name) AS key FROM companies').all();
+  (companies.rows || companies).forEach(c => { companyMap[c.key] = c.id; });
+
+  for (const row of rows) {
+    const firstName = g(row, mapping, 'first_name');
+    const lastName  = g(row, mapping, 'last_name');
+    if (!firstName && !lastName) continue;
+
+    const email = g(row, mapping, 'email') || null;
+    if (email) {
+      const dupe = await db.prepare('SELECT id FROM contacts WHERE LOWER(email) = LOWER(?)').get(email);
+      if (dupe) { summary.skipped++; continue; }
+    }
+
+    const companyName = g(row, mapping, 'company_name');
+    let company_id = null;
+    try { company_id = await getOrCreateCompany(db, companyName, companyMap); } catch (_) {}
+
+    try {
+      await db.prepare(`
+        INSERT INTO contacts (company_id, first_name, last_name, title, email, phone, mobile, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        company_id,
+        firstName || null,
+        lastName  || null,
+        g(row, mapping, 'title')  || null,
+        email,
+        g(row, mapping, 'phone')  || null,
+        g(row, mapping, 'mobile') || null,
+        g(row, mapping, 'notes')  || null,
+      );
+      summary.created++;
+    } catch (e) {
+      summary.errors.push(`"${firstName} ${lastName}": ${e.message}`);
+    }
+  }
+
+  res.json(summary);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/import/lmn/deals  (LMN estimates -> pipeline deals)
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/lmn/deals', async (req, res) => {
+  const { rows = [], mapping = {} } = req.body;
+  const summary = { created: 0, skipped: 0, errors: [] };
+
+  const companyMap = {};
+  const companies = await db.prepare('SELECT id, LOWER(name) AS key FROM companies').all();
+  (companies.rows || companies).forEach(c => { companyMap[c.key] = c.id; });
+
+  for (const row of rows) {
+    const title = g(row, mapping, 'title');
+    if (!title) continue;
+
+    const companyName = g(row, mapping, 'company_name');
+    let company_id = null;
+    try { company_id = await getOrCreateCompany(db, companyName, companyMap); } catch (_) {}
+
+    const rawValue = g(row, mapping, 'value').replace(/[$,]/g, '');
+    const value = parseFloat(rawValue) || 0;
+
+    const statusRaw = g(row, mapping, 'status').toLowerCase();
+    let stage = 'lead';
+    if (/won|approved|active|signed/.test(statusRaw))            stage = 'won';
+    else if (/lost|declined|rejected|closed/.test(statusRaw))    stage = 'lost';
+    else if (/sent|presented|pending|review/.test(statusRaw))    stage = 'proposal';
+    else if (/proposal|quote|estimate/.test(statusRaw))          stage = 'proposal';
+    else if (/prospect|lead|new/.test(statusRaw))                stage = 'lead';
+
+    try {
+      await db.prepare(`
+        INSERT INTO deals (company_id, title, stage, value, notes)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        company_id,
+        title,
+        stage,
+        value,
+        g(row, mapping, 'notes') || null,
+      );
+      summary.created++;
+    } catch (e) {
+      summary.errors.push(`"${title}": ${e.message}`);
+    }
+  }
+
+  res.json(summary);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/import/lmn/jobs  (LMN work orders -> jobs)
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/lmn/jobs', async (req, res) => {
+  const { rows = [], mapping = {} } = req.body;
+  const summary = { created: 0, skipped: 0, errors: [] };
+
+  const companyMap = {};
+  const companies = await db.prepare('SELECT id, LOWER(name) AS key FROM companies').all();
+  (companies.rows || companies).forEach(c => { companyMap[c.key] = c.id; });
+
+  for (const row of rows) {
+    const title = g(row, mapping, 'title');
+    if (!title) continue;
+
+    const companyName = g(row, mapping, 'company_name');
+    let company_id = null;
+    try { company_id = await getOrCreateCompany(db, companyName, companyMap); } catch (_) {}
+
+    const statusRaw = g(row, mapping, 'status').toLowerCase();
+    let status = 'scheduled';
+    if (/complet|done|finish/.test(statusRaw))   status = 'completed';
+    else if (/cancel/.test(statusRaw))           status = 'cancelled';
+    else if (/in.?prog|active|started/.test(statusRaw)) status = 'in_progress';
+
+    try {
+      await db.prepare(`
+        INSERT INTO jobs (company_id, title, job_type, status, notes)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        company_id,
+        title,
+        g(row, mapping, 'job_type') || 'maintenance',
+        status,
+        g(row, mapping, 'notes') || null,
+      );
+      summary.created++;
+    } catch (e) {
+      summary.errors.push(`"${title}": ${e.message}`);
+    }
+  }
+
+  res.json(summary);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/import/lmn/pricebook
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/lmn/pricebook', async (req, res) => {
+  const { rows = [], mapping = {} } = req.body;
+  const summary = { created: 0, skipped: 0, errors: [] };
+
+  for (const row of rows) {
+    const name = g(row, mapping, 'name');
+    if (!name) continue;
+
+    const existing = await db.prepare('SELECT id FROM pricebook_items WHERE LOWER(name) = LOWER(?)').get(name);
+    if (existing) { summary.skipped++; continue; }
+
+    const rawPrice = g(row, mapping, 'unit_price').replace(/[$,]/g, '');
+    const unit_price = parseFloat(rawPrice) || 0;
+
+    try {
+      await db.prepare(`
+        INSERT INTO pricebook_items (name, category, description, unit, unit_price)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        name,
+        g(row, mapping, 'category')    || null,
+        g(row, mapping, 'description') || null,
+        g(row, mapping, 'unit')        || 'ea',
+        unit_price,
+      );
+      summary.created++;
+    } catch (e) {
+      summary.errors.push(`"${name}": ${e.message}`);
+    }
+  }
+
+  res.json(summary);
+});
+
 module.exports = router;
