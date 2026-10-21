@@ -16,7 +16,7 @@ const DEFAULTS = {
   company_zip: '',
   company_license: '',
   company_logo: '',
-  proposal_terms: 'Payment due net 30 days. Price valid for 30 days from proposal date. All work performed per manufacturer specifications and local code.',
+  proposal_terms: 'Payment due net 30 days. Price valid for 30 days from proposal date. All services performed to the highest industry standards.',
   proposal_footer: 'Thank you for the opportunity to earn your business.',
   tax_rate_default: '0',
 };
@@ -278,7 +278,7 @@ export default function Settings() {
 
             <div style={grp}>
               <label style={lbl}>Company Name</label>
-              <input style={inp} value={form.company_name} onChange={f('company_name')} placeholder="Acme HVAC & Plumbing" />
+              <input style={inp} value={form.company_name} onChange={f('company_name')} placeholder="Your Company Name" />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
               <div>
