@@ -8,7 +8,7 @@ import {
   FileText, BarChart2, Settings as SettingsIcon, Globe,
   Bell, LogOut, Menu, X, CheckCircle, Clock, Trash2,
   Search, Wrench, Receipt, Command, Sun, Moon,
-  BookOpen, Shield, Trello, Truck
+  BookOpen, Shield, Trello, Truck, FileUp
 } from 'lucide-react';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
@@ -36,6 +36,7 @@ import JobReport from './pages/JobReport';
 import Vendors from './pages/Vendors';
 import GuidedTour, { TourLaunchButton } from './components/GuidedTour';
 import Integrations from './pages/Integrations';
+import Import from './pages/Import';
 
 const ALL_NAV = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
@@ -52,6 +53,7 @@ const ALL_NAV = [
   { to: '/pricebook', label: 'Pricebook', Icon: BookOpen, roles: ['admin', 'demo'] },
   { to: '/vendors', label: 'Vendors', Icon: Truck, roles: ['admin', 'dispatcher'] },
   { to: '/integrations', label: 'Integrations', Icon: SettingsIcon, roles: ['admin'] },
+    { to: '/import', label: 'Import', Icon: FileUp, roles: ['admin'] },
   { to: '/analytics', label: 'Analytics', Icon: BarChart2, roles: ['admin', 'sales_rep', 'demo'] },
 ];
 
@@ -499,7 +501,8 @@ function AppLayout() {
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/vendors" element={<Vendors />} />
-          <Route path="/integrations" element={<Integrations />} />
+          <Route path="/integrations" element={<Integrations />
+              <Route path="/import" element={<Import />} />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/job-report/:id" element={<JobReport />} />
           <Route path="*" element={<Navigate to={role === 'technician' ? '/my-jobs' : '/'} replace />} />
