@@ -501,8 +501,8 @@ function AppLayout() {
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/vendors" element={<Vendors />} />
-          <Route path="/integrations" element={<Integrations />
-              <Route path="/import" element={<Import />} />} />
+          <Route path="/integrations" element={<Integrations />} />
+              <Route path="/import" element={<Import />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/job-report/:id" element={<JobReport />} />
           <Route path="*" element={<Navigate to={role === 'technician' ? '/my-jobs' : '/'} replace />} />
