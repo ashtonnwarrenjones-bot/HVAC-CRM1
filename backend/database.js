@@ -502,6 +502,77 @@ const SCHEMA_STATEMENTS = [
     synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(source, external_id)
   )`,
+
+  // ── LMN-style tables ──────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS properties (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    zip TEXT,
+    property_type TEXT DEFAULT 'commercial',
+    square_footage REAL,
+    lot_size REAL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS estimates (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    property_id INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+    contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+    estimate_number TEXT UNIQUE,
+    title TEXT NOT NULL,
+    status TEXT DEFAULT 'draft',
+    notes TEXT,
+    valid_until DATE,
+    tax_rate DECIMAL(5,2) DEFAULT 0,
+    subtotal DECIMAL(10,2) DEFAULT 0,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    total DECIMAL(10,2) DEFAULT 0,
+    converted_job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS estimate_items (
+    id SERIAL PRIMARY KEY,
+    estimate_id INTEGER REFERENCES estimates(id) ON DELETE CASCADE,
+    pricebook_item_id INTEGER REFERENCES pricebook_items(id) ON DELETE SET NULL,
+    description TEXT,
+    category TEXT,
+    quantity DECIMAL(10,3) DEFAULT 1,
+    unit TEXT DEFAULT 'each',
+    unit_price DECIMAL(10,2) DEFAULT 0,
+    total DECIMAL(10,2) DEFAULT 0,
+    sort_order INTEGER DEFAULT 0
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS crew_members (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT DEFAULT 'crew',
+    phone TEXT,
+    email TEXT,
+    hourly_rate DECIMAL(8,2) DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS timesheets (
+    id SERIAL PRIMARY KEY,
+    crew_member_id INTEGER REFERENCES crew_members(id) ON DELETE CASCADE,
+    job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+    work_date DATE NOT NULL,
+    clock_in TEXT,
+    clock_out TEXT,
+    hours DECIMAL(6,2),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 
 // ─── Demo data seeder ─────────────────────────────────────────────────────────

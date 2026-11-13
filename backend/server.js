@@ -61,6 +61,12 @@ app.use('/api/vendors', requireAuth, demoGuard, require('./routes/vendors'));
 app.use('/api/quickbooks', requireAuth, demoGuard, qbRouter);
 app.use('/api/divvy', requireAuth, demoGuard, require('./routes/divvy'));
 
+// LMN-style routes
+app.use('/api/properties', requireAuth, demoGuard, require('./routes/properties'));
+app.use('/api/estimates', requireAuth, demoGuard, require('./routes/estimates'));
+app.use('/api/crew', requireAuth, demoGuard, require('./routes/crew'));
+app.use('/api/timesheets', requireAuth, demoGuard, require('./routes/timesheets'));
+
 // Portal admin routes (admin JWT required)
 app.use('/api/portal/admin', requireAuth, demoGuard, portalRouter);
 

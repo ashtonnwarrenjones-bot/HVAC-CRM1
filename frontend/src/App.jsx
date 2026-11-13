@@ -8,7 +8,7 @@ import {
   FileText, BarChart2, Settings as SettingsIcon, Globe,
   Bell, LogOut, Menu, X, CheckCircle, Clock, Trash2,
   Search, Wrench, Receipt, Command, Sun, Moon,
-  BookOpen, Shield, Trello, Truck, FileUp
+  BookOpen, Shield, Trello, Truck, FileUp, ClipboardList, UserCheck
 } from 'lucide-react';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
@@ -37,23 +37,20 @@ import Vendors from './pages/Vendors';
 import GuidedTour, { TourLaunchButton } from './components/GuidedTour';
 import Integrations from './pages/Integrations';
 import Import from './pages/Import';
+import Estimates from './pages/Estimates';
+import Timesheets from './pages/Timesheets';
 
 const ALL_NAV = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
   { to: '/my-jobs', label: 'My Jobs', Icon: Wrench, roles: ['technician'] },
-  { to: '/dispatch', label: 'Dispatch', Icon: Trello, roles: ['admin', 'dispatcher', 'demo'] },
-  { to: '/schedule', label: 'Schedule', Icon: Calendar, roles: ['admin', 'dispatcher', 'demo'] },
-  { to: '/pipeline', label: 'Pipeline', Icon: Target, roles: ['admin', 'sales_rep', 'demo'] },
-  { to: '/companies', label: 'Companies', Icon: Building2, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
+  { to: '/companies', label: 'Clients', Icon: Building2, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
   { to: '/contacts', label: 'Contacts', Icon: Users, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
-  { to: '/proposals', label: 'Proposals', Icon: FileText, roles: ['admin', 'sales_rep', 'demo'] },
-  { to: '/service-requests', label: 'Quote Requests', Icon: FileText, roles: ['admin', 'sales_rep'] },
+  { to: '/estimates', label: 'Estimates', Icon: ClipboardList, roles: ['admin', 'sales_rep', 'demo'] },
+  { to: '/schedule', label: 'Schedule', Icon: Calendar, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/invoices', label: 'Invoices', Icon: Receipt, roles: ['admin', 'dispatcher', 'demo'] },
-  { to: '/memberships', label: 'Memberships', Icon: Shield, roles: ['admin', 'dispatcher', 'demo'] },
+  { to: '/timesheets', label: 'Timesheets', Icon: UserCheck, roles: ['admin', 'dispatcher'] },
   { to: '/pricebook', label: 'Pricebook', Icon: BookOpen, roles: ['admin', 'demo'] },
-  { to: '/vendors', label: 'Vendors', Icon: Truck, roles: ['admin', 'dispatcher'] },
-  { to: '/integrations', label: 'Integrations', Icon: SettingsIcon, roles: ['admin'] },
-    { to: '/import', label: 'Import', Icon: FileUp, roles: ['admin'] },
+  { to: '/import', label: 'Import', Icon: FileUp, roles: ['admin'] },
   { to: '/analytics', label: 'Analytics', Icon: BarChart2, roles: ['admin', 'sales_rep', 'demo'] },
 ];
 
@@ -502,7 +499,9 @@ function AppLayout() {
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/vendors" element={<Vendors />} />
           <Route path="/integrations" element={<Integrations />} />
-              <Route path="/import" element={<Import />} />
+          <Route path="/import" element={<Import />} />
+          <Route path="/estimates" element={<Estimates />} />
+          <Route path="/timesheets" element={<Timesheets />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/job-report/:id" element={<JobReport />} />
           <Route path="*" element={<Navigate to={role === 'technician' ? '/my-jobs' : '/'} replace />} />
