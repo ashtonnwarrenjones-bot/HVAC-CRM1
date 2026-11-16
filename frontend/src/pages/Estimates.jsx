@@ -13,6 +13,159 @@ function fmt$(n) { return '$' + (parseFloat(n)||0).toLocaleString('en-US',{minim
 function fmtP(n) { return (parseFloat(n)||0).toFixed(1) + '%'; }
 function fmtH(n) { return (parseFloat(n)||0).toFixed(2); }
 
+// ── Catalog data for Add Items drawer ────────────────────────────────────────
+const CATALOG = {
+  Labor: [
+    { name:'+Fertilization', units:'Hours', avgWage:22 },
+    { name:'+Herbicide Spray', units:'Hours', avgWage:22 },
+    { name:'+Irrigation Start Up/Repairs', units:'Hours', avgWage:36 },
+    { name:'+Irrigation Winterization', units:'Hours', avgWage:36 },
+    { name:'+Landscape', units:'Hours', avgWage:22 },
+    { name:'+Simplified Services', units:'Hours', avgWage:22 },
+    { name:'+Snow- ATV/Snowrator', units:'Hours', avgWage:20 },
+    { name:'+Snow- Backhoe/Skid', units:'Hours', avgWage:30 },
+    { name:'+Snow- Plow Truck', units:'Hours', avgWage:30 },
+    { name:'+Snow- Shovel/Sidewalks', units:'Hours', avgWage:20 },
+    { name:'Dayporting Labor', units:'Hours', avgWage:25 },
+    { name:'Dayporting Labor ($18/HR)', units:'Hours', avgWage:18 },
+    { name:'Facilities Crew Labor', units:'Hours', avgWage:25 },
+    { name:'Irrigation Labor Rate', units:'Hours', avgWage:35 },
+    { name:'Irrigation Repair Labor', units:'Hours', avgWage:36 },
+  ],
+  Equip: [
+    { name:'Skid Steer', units:'hr', avgWage:85 },
+    { name:'Mini Excavator', units:'hr', avgWage:95 },
+    { name:'Dump Truck', units:'hr', avgWage:75 },
+    { name:'Plow Truck', units:'hr', avgWage:65 },
+    { name:'Zero Turn Mower', units:'hr', avgWage:45 },
+    { name:'Walk-Behind Mower', units:'hr', avgWage:30 },
+    { name:'Blower/Trimmer', units:'hr', avgWage:20 },
+  ],
+  Material: [
+    { name:'Mulch (bulk)', units:'yd³', avgWage:38 },
+    { name:'Rock/Gravel', units:'ton', avgWage:42 },
+    { name:'Topsoil', units:'yd³', avgWage:35 },
+    { name:'Seed Mix', units:'lb', avgWage:4 },
+    { name:'Fertilizer', units:'lb', avgWage:3 },
+    { name:'Herbicide', units:'gal', avgWage:28 },
+    { name:'Irrigation Pipe (1")', units:'lf', avgWage:1.5 },
+    { name:'Irrigation Head', units:'each', avgWage:12 },
+    { name:'Salt/Ice Melt', units:'lb', avgWage:0.4 },
+    { name:'Concrete (3000psi)', units:'yd³', avgWage:155 },
+  ],
+  Subs: [
+    { name:'Subcontract - Electrical', units:'each', avgWage:0 },
+    { name:'Subcontract - Fencing', units:'lf', avgWage:0 },
+    { name:'Subcontract - Paving', units:'sqft', avgWage:0 },
+    { name:'Subcontract - Striping', units:'lf', avgWage:0 },
+    { name:'Subcontract - Concrete', units:'sqft', avgWage:0 },
+  ],
+  Other: [
+    { name:'Permit Fee', units:'each', avgWage:0 },
+    { name:'Disposal Fee', units:'each', avgWage:0 },
+    { name:'Equipment Rental', units:'day', avgWage:0 },
+    { name:'Mobilization', units:'each', avgWage:0 },
+  ],
+  Templates: [
+    { name:'Backflow cover and concrete', desc:'Backflow cover and concrete per spec.' },
+    { name:'Concrete Grinding', desc:'Grind concrete flat in the spots that are raised. This will help prevent trip hazards for customers.' },
+    { name:'Concrete Repair', desc:'Along the stone front there are multiple large cracks and holes of concrete. We will clean these out and patch them.' },
+    { name:'Docker Canal', desc:'Clean out canal on south side of property. This includes all trash and furniture built up from the winter.' },
+    { name:'IRR - Irrigation Repairs', desc:'Site will be visited and monitored roughly 1 time per week to ensure proper irrigation function.' },
+    { name:'IRR - Irrigation Startup T&M', desc:'Turn on system run through valves to verify: 1. Adequate water coverage, 2. All Heads and Valves are functioning.' },
+    { name:'LAN - Aeration', desc:'Core aeration to all turf areas performed in the spring to promote healthy soil and turf. Does not include disposal of plugs.' },
+    { name:'LAN - Fall Cleanup', desc:'A one time service consisting of all beds, trimming of needed perennials, removal of summer annuals, leaf removal and final pick up from turf and beds.' },
+    { name:'LAN - First Time Cleanup', desc:'A one time service to remove all weeds, mowing and trimming, cleaning, and removing trash.' },
+    { name:'LAN - Hard Surface Weed Control', desc:'Spraying of all unwanted weeds in hardscapes, parking lot and or other hard surfaces.' },
+    { name:'LAN - Lawn Fertilization and Weed Control', desc:'Custom fertilizer service consisting of a controlled-slow release pre-emergent application to promote growth, color, and overall health of turf.' },
+  ],
+};
+
+// ── Add Items + Templates Drawer ──────────────────────────────────────────────
+function AddItemsDrawer({ open, onClose, onAddItem, activeArea }) {
+  const [drawerTab, setDrawerTab] = useState('Labor');
+  const [search, setSearch] = useState('');
+  const [templateCat, setTemplateCat] = useState('ANY');
+
+  const tabs = ['Labor','Equip','Material','Subs','Other','Templates'];
+
+  const results = (() => {
+    const list = CATALOG[drawerTab] || [];
+    const q = search.toLowerCase();
+    return list.filter(i => !q || i.name.toLowerCase().includes(q) || (i.desc||'').toLowerCase().includes(q));
+  })();
+
+  if (!open) return null;
+
+  return (
+    <div style={{ position:'fixed', top:0, right:0, bottom:0, width:400, background:'#fff', boxShadow:'-4px 0 24px rgba(0,0,0,0.18)', zIndex:200, display:'flex', flexDirection:'column', borderLeft:'2px solid #0f766e' }}>
+      {/* Header tabs */}
+      <div style={{ background:'#f8fafc', borderBottom:'1px solid #e2e8f0', padding:'0 12px', display:'flex', alignItems:'center', gap:0 }}>
+        {tabs.map(t => (
+          <button key={t} onClick={() => { setDrawerTab(t); setSearch(''); }} style={{
+            background:'none', border:'none',
+            borderBottom: drawerTab===t ? '2px solid #0f766e' : '2px solid transparent',
+            color: drawerTab===t ? '#0f766e' : '#64748b',
+            padding:'11px 10px', cursor:'pointer', fontSize:12, fontWeight:600, whiteSpace:'nowrap'
+          }}>{t}</button>
+        ))}
+        <button onClick={onClose} style={{ marginLeft:'auto', background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:20, padding:'0 8px', lineHeight:1 }}>✕</button>
+      </div>
+
+      {/* Search + New button */}
+      <div style={{ padding:'10px 12px', borderBottom:'1px solid #e2e8f0', display:'flex', gap:6 }}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Type to Search"
+          style={{ flex:1, border:'1px solid #cbd5e1', borderRadius:4, padding:'6px 10px', fontSize:13, color:'#1e293b', outline:'none' }} />
+        {drawerTab === 'Templates' && (
+          <select value={templateCat} onChange={e=>setTemplateCat(e.target.value)}
+            style={{ border:'1px solid #cbd5e1', borderRadius:4, padding:'6px 8px', fontSize:12, color:'#64748b', background:'#fff' }}>
+            <option value="ANY">[ANY]</option>
+            {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        )}
+        <button style={{ background:'#16a34a', border:'none', borderRadius:4, color:'#fff', padding:'6px 12px', cursor:'pointer', fontSize:12, fontWeight:700 }}>+ New</button>
+      </div>
+
+      {/* Results count */}
+      <div style={{ padding:'6px 12px', fontSize:12, color:'#64748b', borderBottom:'1px solid #f1f5f9' }}>
+        Results ({results.length})
+      </div>
+
+      {/* Results list */}
+      <div style={{ flex:1, overflowY:'auto' }}>
+        {results.map((item, i) => (
+          <div key={i} style={{ display:'flex', alignItems:'flex-start', padding:'9px 12px', borderBottom:'1px solid #f1f5f9', gap:10,
+            background: i%2===0?'#fff':'#fafafa' }}
+            onMouseEnter={e=>e.currentTarget.style.background='#f0fdf4'}
+            onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafa'}>
+            <button onClick={() => {
+              onAddItem({
+                description: item.name,
+                category: activeArea,
+                quantity: 1,
+                unit: item.units || 'units',
+                unit_cost: item.avgWage || 0,
+                unit_price: item.avgWage ? parseFloat((item.avgWage / 0.75).toFixed(2)) : 0,
+                hours: item.units === 'Hours' || item.units === 'hr' ? 1 : 0,
+              });
+            }} style={{ background:'#16a34a', border:'none', borderRadius:4, color:'#fff', width:24, height:24, cursor:'pointer', fontSize:16, lineHeight:'24px', padding:0, flexShrink:0, marginTop:1 }}>+</button>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13, color:'#1e293b', fontWeight:500, lineHeight:1.3 }}>{item.name}</div>
+              {drawerTab === 'Templates'
+                ? <div style={{ fontSize:11, color:'#64748b', marginTop:2, lineHeight:1.4 }}>{item.desc}</div>
+                : <div style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>[Units: {item.units}] [Avg Wage: ${item.avgWage?.toFixed(2)}]</div>
+              }
+            </div>
+          </div>
+        ))}
+        {results.length === 0 && (
+          <div style={{ padding:40, textAlign:'center', color:'#94a3b8', fontSize:13 }}>No results for "{search}"</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Summary Bar ───────────────────────────────────────────────────────────────
 function SummaryBar({ items }) {
   const totalHours = items.reduce((s,i) => s + (parseFloat(i.hours)||0), 0);
@@ -44,7 +197,7 @@ function SummaryBar({ items }) {
 }
 
 // ── Work area row (flat table, inline-expand like LMN) ────────────────────────
-function WorkAreaRow({ name, items, costCode, isOpen, onToggle, onRename, onChangeCostCode, onAddItem, onChangeItem, onDeleteItem, onDelete, idx }) {
+function WorkAreaRow({ name, items, costCode, isOpen, onToggle, onRename, onChangeCostCode, onAddItem, onOpenDrawer, onChangeItem, onDeleteItem, onDelete, idx }) {
   const hrs   = items.reduce((s,i) => s + (parseFloat(i.hours)||0), 0);
   const cogs  = items.reduce((s,i) => s + (parseFloat(i.unit_cost)||0)*(parseFloat(i.quantity)||1), 0);
   const price = items.reduce((s,i) => s + (parseFloat(i.unit_price)||0)*(parseFloat(i.quantity)||1), 0);
@@ -100,7 +253,8 @@ function WorkAreaRow({ name, items, costCode, isOpen, onToggle, onRename, onChan
                 <button style={{ background:'#fff', border:'1px solid #cbd5e1', borderRadius:4, color:'#1e293b', padding:'4px 10px', cursor:'pointer', fontSize:12, fontWeight:500 }}>$ Edit Pricing</button>
                 <button style={{ background:'#fff', border:'1px solid #cbd5e1', borderRadius:4, color:'#1e293b', padding:'4px 10px', cursor:'pointer', fontSize:12, fontWeight:500 }}>≡ Edit Notes</button>
                 <button style={{ background:'#fff', border:'1px solid #cbd5e1', borderRadius:4, color:'#1e293b', padding:'4px 10px', cursor:'pointer', fontSize:12, fontWeight:500 }}>$ Edit Taxes</button>
-                <button onClick={onAddItem} style={{ background:'#0f766e', border:'none', borderRadius:4, color:'#fff', padding:'4px 12px', cursor:'pointer', fontSize:12, fontWeight:600, marginLeft:'auto' }}>
+                <button onClick={onAddItem} style={{ background:'#fff', border:'1px solid #cbd5e1', borderRadius:4, color:'#1e293b', padding:'4px 10px', cursor:'pointer', fontSize:12, fontWeight:500 }}>+ Add Line</button>
+                <button onClick={onOpenDrawer} style={{ background:'#0f766e', border:'none', borderRadius:4, color:'#fff', padding:'4px 12px', cursor:'pointer', fontSize:12, fontWeight:600, marginLeft:'auto' }}>
                   + Add Items + Templates
                 </button>
               </div>
@@ -197,6 +351,8 @@ export default function Estimates() {
   const [items, setItems] = useState([]);
   const [openAreas, setOpenAreas] = useState({});
   const [areaCostCodes, setAreaCostCodes] = useState({});
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerArea, setDrawerArea] = useState('');
   const [companies, setCompanies] = useState([]);
   const [properties, setProperties] = useState([]);
   const [contacts, setContacts] = useState([]);
@@ -640,6 +796,7 @@ export default function Estimates() {
                       onRename={n => handleRenameArea(areaName, n)}
                       onChangeCostCode={v => setAreaCostCodes(p=>({...p,[areaName]:v}))}
                       onAddItem={() => setItems(p=>[...p,{description:'',category:areaName,quantity:1,unit:'units',unit_price:0,unit_cost:0,hours:0}])}
+                      onOpenDrawer={() => { setDrawerArea(areaName); setDrawerOpen(true); }}
                       onChangeItem={(lIdx,k,v) => handleChangeItem(areaName,lIdx,k,v)}
                       onDeleteItem={lIdx => handleDeleteItem(areaName,lIdx)}
                       onDelete={() => setItems(p=>p.filter(i=>i.category!==areaName))}
@@ -651,6 +808,15 @@ export default function Estimates() {
           </div>
         )}
       </div>
+
+      {/* Add Items + Templates drawer */}
+      <AddItemsDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        activeArea={drawerArea}
+        onAddItem={newItem => setItems(p => [...p, newItem])}
+      />
+      {drawerOpen && <div onClick={() => setDrawerOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.25)', zIndex:199 }} />}
 
       {/* Sticky bottom action bar — matches LMN layout */}
       <div style={{ background:'#1e293b', borderTop:'2px solid #0f766e', padding:'10px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', position:'fixed', bottom:0, left:0, right:0, zIndex:50 }}>
