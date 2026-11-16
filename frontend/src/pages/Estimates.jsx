@@ -6,6 +6,8 @@ const DIVISIONS = ['Landscape', 'Snow', 'Pavement', 'Facilities', 'Irrigation', 
 const STATUSES = ['draft', 'sent', 'approved', 'rejected', 'converted', 'in_progress'];
 const COST_CODES = ['Landscape', 'Snow', 'Pavement', 'Facilities', 'Irrigation', 'Lighting', 'Hardscape', 'Labor', 'Materials', 'Subcontract', 'Equipment', 'Other'];
 const UNITS = ['each', 'hr', 'sqft', 'sqyd', 'lf', 'lb', 'ton', 'gal', 'day', 'mo', 'units'];
+const RELATIONS = ['None', 'Renewal', 'Enhancement', 'Change Order', 'Rebid', 'New Client', 'Other'];
+const REFERRALS = ['<UNKNOWN>', 'Door Hanger', 'Email', 'Facebook', 'Google', 'Instagram', 'Phone', 'Referral', 'Sign', 'Website', 'Word of Mouth', 'Other'];
 
 function fmt$(n) { return '$' + (parseFloat(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtP(n) { return (parseFloat(n)||0).toFixed(1) + '%'; }
@@ -188,8 +190,9 @@ export default function Estimates() {
   const [showChangeClient, setShowChangeClient] = useState(false);
   const [form, setForm] = useState({
     title:'', estimate_number:'', status:'draft', valid_until:'', close_date:'',
-    division:'', salesperson:'', confidence:50, notes:'', tax_rate:0,
+    division:'', salesperson:'', estimator:'', confidence:50, notes:'', tax_rate:0,
     company_id:'', property_id:'', contact_id:'', exclude_stats: false,
+    relations:'None', referral:'<UNKNOWN>', ref_note:'',
   });
   const [items, setItems] = useState([]);
   const [openAreas, setOpenAreas] = useState({});
@@ -395,6 +398,12 @@ export default function Estimates() {
                     <input placeholder="Version" style={{ ...inp, color:'#94a3b8' }} disabled />
                   </div>
                 </div>
+                <div style={fld}>
+                  <label style={lbl}>Relations</label>
+                  <select value={form.relations||'None'} onChange={f('relations')} style={inp}>
+                    {RELATIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                   <div style={fld}>
                     <label style={lbl}>Estimate Date</label>
@@ -436,24 +445,37 @@ export default function Estimates() {
                 <h3 style={{ color:'#1e293b', fontSize:15, fontWeight:700, margin:'0 0 16px 0' }}>Client Information</h3>
 
                 {!showChangeClient && clientCompany ? (
-                  /* Read-only display (like LMN) */
+                  /* Read-only display with editable Referral + Ref. Note (like LMN) */
                   <div>
                     {[
-                      ['Client Name', clientCompany?.name],
-                      ['Billing Address', clientCompany?.address || '—'],
-                      ['Contact Name', clientContact ? `${clientContact.first_name} ${clientContact.last_name}` : '—'],
-                      ['Contact Info', clientContact?.contact_email || '—'],
-                      ['Jobsite Name', clientProperty?.name || '—'],
-                      ['Jobsite Address', clientProperty?.address || '—'],
-                    ].map(([label, val]) => (
-                      <div key={label} style={{ display:'flex', borderBottom:'1px solid #f1f5f9', padding:'8px 0', gap:12 }}>
-                        <span style={{ color:'#64748b', fontSize:13, minWidth:130, flexShrink:0 }}>{label}</span>
-                        <span style={{ color:'#1e293b', fontSize:13, fontWeight: label==='Client Name'?600:400 }}>{val}</span>
+                      ['Client Name', clientCompany?.name, true],
+                      ['Billing Address', clientCompany?.address || '—', false],
+                      ['Contact Name', clientContact ? `${clientContact.first_name} ${clientContact.last_name}` : '—', false],
+                      ['Contact Info', clientContact?.contact_email || '—', false],
+                      ['Jobsite Name', clientProperty?.name || '—', false],
+                      ['Jobsite Address', clientProperty?.address || '—', false],
+                    ].map(([label, val, bold]) => (
+                      <div key={label} style={{ display:'flex', alignItems:'center', borderBottom:'1px solid #f1f5f9', padding:'7px 0', gap:12 }}>
+                        <span style={{ color:'#64748b', fontSize:13, minWidth:130, flexShrink:0, fontWeight:500 }}>{label}</span>
+                        <span style={{ color:'#1e293b', fontSize:13, fontWeight: bold?700:400 }}>{val}</span>
                       </div>
                     ))}
-                    <div style={{ marginTop:14, display:'flex', gap:8 }}>
-                      <button onClick={() => {}} style={{ background:'#f1f5f9', border:'1px solid #cbd5e1', borderRadius:4, color:'#64748b', padding:'6px 12px', cursor:'pointer', fontSize:12 }}>🗺 Map Site</button>
-                      <button onClick={() => setShowChangeClient(true)} style={{ background:'#0f766e', border:'none', borderRadius:4, color:'#fff', padding:'6px 14px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✎ Change Client/Jobsite</button>
+                    {/* Referral — editable dropdown even in display mode */}
+                    <div style={{ display:'flex', alignItems:'center', borderBottom:'1px solid #f1f5f9', padding:'5px 0', gap:12 }}>
+                      <span style={{ color:'#64748b', fontSize:13, minWidth:130, flexShrink:0, fontWeight:500 }}>Referral</span>
+                      <select value={form.referral||'<UNKNOWN>'} onChange={f('referral')} style={{ background:'#fff', border:'1px solid #cbd5e1', borderRadius:4, color:'#1e293b', padding:'4px 8px', fontSize:13, flex:1 }}>
+                        {REFERRALS.map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                    {/* Ref. Note — editable text */}
+                    <div style={{ display:'flex', alignItems:'center', borderBottom:'1px solid #f1f5f9', padding:'5px 0', gap:12 }}>
+                      <span style={{ color:'#64748b', fontSize:13, minWidth:130, flexShrink:0, fontWeight:500 }}>Ref. Note</span>
+                      <input value={form.ref_note||''} onChange={f('ref_note')} placeholder="Referral Notes"
+                        style={{ background:'#fff', border:'1px solid #cbd5e1', borderRadius:4, color:'#1e293b', padding:'4px 8px', fontSize:13, flex:1 }} />
+                    </div>
+                    <div style={{ marginTop:12, display:'flex', gap:8 }}>
+                      <button onClick={() => {}} style={{ background:'#f1f5f9', border:'1px solid #cbd5e1', borderRadius:4, color:'#64748b', padding:'6px 12px', cursor:'pointer', fontSize:12 }}>📍 Map Site</button>
+                      <button onClick={() => setShowChangeClient(true)} style={{ background:'#0f766e', border:'none', borderRadius:4, color:'#fff', padding:'6px 14px', cursor:'pointer', fontSize:12, fontWeight:600 }}>🔗 Change Client/Jobsite</button>
                     </div>
                   </div>
                 ) : (
@@ -499,19 +521,36 @@ export default function Estimates() {
                 {/* Salesperson */}
                 <div>
                   <div style={{ textAlign:'center', marginBottom:8 }}>
-                    <div style={{ fontSize:32, lineHeight:1 }}>👤</div>
+                    <svg width="40" height="40" viewBox="0 0 40 40" style={{ display:'block', margin:'0 auto' }}>
+                      <circle cx="20" cy="14" r="8" fill="#94a3b8"/>
+                      <rect x="6" y="26" width="28" height="10" rx="5" fill="#94a3b8"/>
+                      <rect x="24" y="22" width="14" height="10" rx="3" fill="#64748b"/>
+                      <polyline points="26,26 29,29 34,24" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                     <div style={{ fontSize:12, color:'#64748b', marginTop:4, fontWeight:500 }}>Salesperson</div>
                   </div>
-                  <input value={form.salesperson||''} onChange={f('salesperson')} placeholder="Salesperson"
-                    style={{ ...inp, textAlign:'center' }} />
+                  <select value={form.salesperson||''} onChange={f('salesperson')} style={{ ...inp, textAlign:'center' }}>
+                    <option value="">Select…</option>
+                    {contacts.map(c => <option key={c.id} value={`${c.first_name} ${c.last_name}`}>{c.first_name} {c.last_name}</option>)}
+                    <option value="ashtonnwarrenjones">ashtonnwarrenjones</option>
+                  </select>
                 </div>
                 {/* Estimator */}
                 <div>
                   <div style={{ textAlign:'center', marginBottom:8 }}>
-                    <div style={{ fontSize:32, lineHeight:1 }}>✏️</div>
+                    <svg width="40" height="40" viewBox="0 0 40 40" style={{ display:'block', margin:'0 auto' }}>
+                      <circle cx="18" cy="14" r="8" fill="#94a3b8"/>
+                      <rect x="4" y="26" width="24" height="10" rx="5" fill="#94a3b8"/>
+                      <line x1="28" y1="20" x2="36" y2="28" stroke="#64748b" strokeWidth="3" strokeLinecap="round"/>
+                      <circle cx="28" cy="20" r="2.5" fill="#64748b"/>
+                    </svg>
                     <div style={{ fontSize:12, color:'#64748b', marginTop:4, fontWeight:500 }}>Estimator</div>
                   </div>
-                  <input placeholder="Estimator" style={{ ...inp, textAlign:'center', color:'#94a3b8' }} />
+                  <select value={form.estimator||''} onChange={f('estimator')} style={{ ...inp, textAlign:'center' }}>
+                    <option value="">Select…</option>
+                    {contacts.map(c => <option key={c.id} value={`${c.first_name} ${c.last_name}`}>{c.first_name} {c.last_name}</option>)}
+                    <option value="ashtonnwarrenjones">ashtonnwarrenjones</option>
+                  </select>
                 </div>
                 {/* Confidence Level */}
                 <div>
@@ -613,26 +652,37 @@ export default function Estimates() {
         )}
       </div>
 
-      {/* Sticky bottom action bar */}
-      <div style={{ background:'#fff', borderTop:'1px solid #e2e8f0', padding:'10px 24px', display:'flex', justifyContent:'space-between', alignItems:'center', position:'fixed', bottom:0, left:0, right:0, zIndex:50 }}>
-        <div style={{ display:'flex', gap:8 }}>
-          <button onClick={() => navigate('/estimates')} style={{ background:'#f1f5f9', border:'1px solid #cbd5e1', borderRadius:4, color:'#64748b', padding:'7px 14px', cursor:'pointer', fontSize:13, fontWeight:600 }}>
-            ← Back to Estimates
+      {/* Sticky bottom action bar — matches LMN layout */}
+      <div style={{ background:'#1e293b', borderTop:'2px solid #0f766e', padding:'10px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', position:'fixed', bottom:0, left:0, right:0, zIndex:50 }}>
+        <div style={{ display:'flex', gap:6 }}>
+          <button onClick={() => navigate('/estimates')} style={{ background:'#334155', border:'none', borderRadius:4, color:'#e2e8f0', padding:'7px 13px', cursor:'pointer', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
+            ◀ Back to Estimates
+          </button>
+          <button onClick={() => navigate('/')} style={{ background:'#334155', border:'none', borderRadius:4, color:'#e2e8f0', padding:'7px 13px', cursor:'pointer', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
+            ◀ Back to CRM
           </button>
         </div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          {error && <span style={{ color:'#dc2626', fontSize:13 }}>{error}</span>}
-          <button style={{ background:'#f1f5f9', border:'1px solid #cbd5e1', borderRadius:4, color:'#64748b', padding:'7px 14px', cursor:'pointer', fontSize:13 }}>
-            Save Template
+        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+          {error && <span style={{ color:'#fca5a5', fontSize:12 }}>{error}</span>}
+          <button style={{ background:'#1d4ed8', border:'none', borderRadius:4, color:'#fff', padding:'7px 13px', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+            ▷ Create Job
           </button>
+          <button style={{ background:'#0369a1', border:'none', borderRadius:4, color:'#fff', padding:'7px 13px', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+            → Mark for QB Export
+          </button>
+          <button style={{ background:'#334155', border:'1px solid #475569', borderRadius:4, color:'#e2e8f0', padding:'7px 13px', cursor:'pointer', fontSize:12 }}>
+            📄 Save Template
+          </button>
+          <div style={{ position:'relative' }}>
+            <button style={{ background:'#334155', border:'1px solid #475569', borderRadius:4, color:'#e2e8f0', padding:'7px 13px', cursor:'pointer', fontSize:12 }}>
+              ⚙ Manage ▾
+            </button>
+          </div>
           {isExisting && (
-            <button onClick={handleDelete} style={{ background:'#fee2e2', border:'1px solid #fca5a5', borderRadius:4, color:'#dc2626', padding:'7px 14px', cursor:'pointer', fontSize:13, fontWeight:600 }}>
-              Delete
+            <button onClick={handleDelete} style={{ background:'#dc2626', border:'none', borderRadius:4, color:'#fff', padding:'7px 13px', cursor:'pointer', fontSize:12, fontWeight:700 }}>
+              🗑 Delete
             </button>
           )}
-          <button style={{ background:'#1d4ed8', border:'none', borderRadius:4, color:'#fff', padding:'7px 14px', cursor:'pointer', fontSize:13, fontWeight:600 }}>
-            Create Job
-          </button>
           <button onClick={handleSave} disabled={saving} style={{
             background:'#0f766e', border:'none', borderRadius:4, color:'#fff',
             padding:'7px 20px', cursor:'pointer', fontSize:13, fontWeight:700, opacity:saving?0.6:1
