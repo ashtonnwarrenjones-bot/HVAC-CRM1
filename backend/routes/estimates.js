@@ -43,32 +43,40 @@ router.get('/:id', async (req, res) => {
 // POST /api/estimates
 router.post('/', async (req, res) => {
   try {
-    const { company_id, property_id, contact_id, title, notes, valid_until, tax_rate, items = [] } = req.body;
+    const { company_id, property_id, contact_id, title, notes, valid_until, tax_rate,
+            division, salesperson, confidence, items = [] } = req.body;
     if (!title) return res.status(400).json({ error: 'title is required' });
 
     const existing = await db.prepare('SELECT estimate_number FROM estimates ORDER BY id DESC LIMIT 50').all();
     const estimate_number = nextEstimateNumber(existing);
 
-    // Calculate totals from items
     const subtotal = items.reduce((s, i) => s + ((i.quantity || 1) * (i.unit_price || 0)), 0);
+    const total_cost = items.reduce((s, i) => s + ((i.quantity || 1) * (i.unit_cost || 0)), 0);
+    const total_hours = items.reduce((s, i) => s + (parseFloat(i.hours) || 0), 0);
     const tr = parseFloat(tax_rate) || 0;
     const tax_amount = subtotal * (tr / 100);
     const total = subtotal + tax_amount;
 
     const r = await db.prepare(
-      `INSERT INTO estimates (company_id, property_id, contact_id, title, estimate_number, notes, valid_until, tax_rate, subtotal, tax_amount, total)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
-    ).run(company_id, property_id, contact_id, title, estimate_number, notes, valid_until, tr, subtotal, tax_amount, total);
+      `INSERT INTO estimates (company_id, property_id, contact_id, title, estimate_number, notes, valid_until,
+       tax_rate, subtotal, tax_amount, total, division, salesperson, confidence)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    ).run(company_id, property_id, contact_id, title, estimate_number, notes, valid_until,
+          tr, subtotal, tax_amount, total,
+          division || '', salesperson || '', confidence != null ? parseInt(confidence) : 50);
     const id = r.lastInsertRowid || r.rows?.[0]?.id;
 
-    // Insert items
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       const lineTotal = (it.quantity || 1) * (it.unit_price || 0);
       await db.prepare(
-        `INSERT INTO estimate_items (estimate_id, pricebook_item_id, description, category, quantity, unit, unit_price, total, sort_order)
-         VALUES (?,?,?,?,?,?,?,?,?)`
-      ).run(id, it.pricebook_item_id || null, it.description, it.category, it.quantity || 1, it.unit || 'each', it.unit_price || 0, lineTotal, i);
+        `INSERT INTO estimate_items (estimate_id, pricebook_item_id, description, category, quantity, unit,
+         unit_price, unit_cost, hours, total, sort_order)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+      ).run(id, it.pricebook_item_id || null, it.description, it.category || '',
+            it.quantity || 1, it.unit || 'each',
+            it.unit_price || 0, it.unit_cost || 0, it.hours || 0,
+            lineTotal, i);
     }
 
     const estimate = await db.prepare('SELECT * FROM estimates WHERE id = ?').get(id);
@@ -80,7 +88,8 @@ router.post('/', async (req, res) => {
 // PUT /api/estimates/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { company_id, property_id, contact_id, title, status, notes, valid_until, tax_rate, items } = req.body;
+    const { company_id, property_id, contact_id, title, status, notes, valid_until, tax_rate,
+            division, salesperson, confidence, items } = req.body;
     const id = req.params.id;
 
     let subtotal = 0, tax_amount = 0, total = 0;
@@ -95,9 +104,13 @@ router.put('/:id', async (req, res) => {
     }
 
     await db.prepare(
-      `UPDATE estimates SET company_id=?, property_id=?, contact_id=?, title=?, status=?, notes=?, valid_until=?,
-       tax_rate=?, subtotal=?, tax_amount=?, total=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
-    ).run(company_id, property_id, contact_id, title, status, notes, valid_until, parseFloat(tax_rate) || 0, subtotal, tax_amount, total, id);
+      `UPDATE estimates SET company_id=?, property_id=?, contact_id=?, title=?, status=?, notes=?,
+       valid_until=?, tax_rate=?, subtotal=?, tax_amount=?, total=?,
+       division=?, salesperson=?, confidence=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
+    ).run(company_id, property_id, contact_id, title, status, notes, valid_until,
+          parseFloat(tax_rate) || 0, subtotal, tax_amount, total,
+          division || '', salesperson || '', confidence != null ? parseInt(confidence) : 50,
+          id);
 
     if (items) {
       await db.prepare('DELETE FROM estimate_items WHERE estimate_id = ?').run(id);
@@ -105,9 +118,13 @@ router.put('/:id', async (req, res) => {
         const it = items[i];
         const lineTotal = (it.quantity || 1) * (it.unit_price || 0);
         await db.prepare(
-          `INSERT INTO estimate_items (estimate_id, pricebook_item_id, description, category, quantity, unit, unit_price, total, sort_order)
-           VALUES (?,?,?,?,?,?,?,?,?)`
-        ).run(id, it.pricebook_item_id || null, it.description, it.category, it.quantity || 1, it.unit || 'each', it.unit_price || 0, lineTotal, i);
+          `INSERT INTO estimate_items (estimate_id, pricebook_item_id, description, category, quantity, unit,
+           unit_price, unit_cost, hours, total, sort_order)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+        ).run(id, it.pricebook_item_id || null, it.description, it.category || '',
+              it.quantity || 1, it.unit || 'each',
+              it.unit_price || 0, it.unit_cost || 0, it.hours || 0,
+              lineTotal, i);
       }
     }
 
@@ -127,7 +144,8 @@ router.post('/:id/convert', async (req, res) => {
     const r = await db.prepare(
       `INSERT INTO jobs (company_id, title, job_type, status, notes)
        VALUES (?,?,?,?,?)`
-    ).run(estimate.company_id, estimate.title, 'service', 'scheduled', `Created from estimate ${estimate.estimate_number}`);
+    ).run(estimate.company_id, estimate.title, 'service', 'scheduled',
+          `Created from estimate ${estimate.estimate_number}`);
     const jobId = r.lastInsertRowid || r.rows?.[0]?.id;
 
     await db.prepare('UPDATE estimates SET status=?, converted_job_id=? WHERE id=?').run('converted', jobId, id);

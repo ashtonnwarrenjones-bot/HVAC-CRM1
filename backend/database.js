@@ -982,6 +982,11 @@ async function initDb() {
     "ALTER TABLE pricebook_items ADD COLUMN IF NOT EXISTS vendor_part_number TEXT",
     "ALTER TABLE pricebook_items ADD COLUMN IF NOT EXISTS vendor_cost DECIMAL(10,2)",
     "ALTER TABLE deals ADD COLUMN IF NOT EXISTS budget DECIMAL(10,2)",
+    "ALTER TABLE estimates ADD COLUMN IF NOT EXISTS division TEXT DEFAULT ''",
+    "ALTER TABLE estimates ADD COLUMN IF NOT EXISTS salesperson TEXT DEFAULT ''",
+    "ALTER TABLE estimates ADD COLUMN IF NOT EXISTS confidence INTEGER DEFAULT 50",
+    "ALTER TABLE estimate_items ADD COLUMN IF NOT EXISTS unit_cost NUMERIC DEFAULT 0",
+    "ALTER TABLE estimate_items ADD COLUMN IF NOT EXISTS hours NUMERIC DEFAULT 0",
   ];
 
   for (const sql of columnMigrations) {
@@ -1003,3 +1008,4 @@ module.exports.initDb = initDb;
 module.exports.seedDemoData = seedDemoData;
 module.exports.createNotification = createNotification;
 module.exports.pool = pool;
+

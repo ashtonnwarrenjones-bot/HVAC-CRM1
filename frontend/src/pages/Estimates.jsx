@@ -1,415 +1,430 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ChevronRight, FileText, CheckCircle, XCircle, Clock, Send, Hammer, Search, Trash2, Edit2, ArrowRight } from 'lucide-react';
-import axios from 'axios';
+import { useNavigate, useParams } from 'react-router-dom';
 
-const STATUS_CONFIG = {
-  draft:     { label: 'Draft',     color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  sent:      { label: 'Sent',      color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-  approved:  { label: 'Approved',  color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
-  rejected:  { label: 'Rejected',  color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
-  converted: { label: 'Job Created', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
-};
+const API = '/api';
+const DIVISIONS = ['Landscape', 'Snow', 'Pavement', 'Facilities', 'Irrigation', 'Lighting', 'Hardscape', 'Other'];
+const STATUSES = ['draft', 'sent', 'approved', 'rejected', 'converted'];
+const UNITS = ['each', 'hr', 'sqft', 'sqyd', 'lf', 'lb', 'ton', 'gal', 'day', 'mo'];
 
-function fmt(n) { return '$' + (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmt$(n) { return '$' + (parseFloat(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtP(n) { return (parseFloat(n)||0).toFixed(1) + '%'; }
+function fmtH(n) { return (parseFloat(n)||0).toFixed(1) + ' h'; }
+
+function SummaryBar({ items }) {
+  const totalHours = items.reduce((s,i) => s + (parseFloat(i.hours)||0), 0);
+  const totalCost  = items.reduce((s,i) => s + (parseFloat(i.unit_cost)||0)*(parseFloat(i.quantity)||1), 0);
+  const subtotal   = items.reduce((s,i) => s + (parseFloat(i.unit_price)||0)*(parseFloat(i.quantity)||1), 0);
+  const profit     = subtotal - totalCost;
+  const profitPct  = subtotal > 0 ? (profit / subtotal) * 100 : 0;
+  const breakeven  = subtotal > 0 ? (totalCost / subtotal) * 100 : 0;
+  const cells = [
+    { label: 'Man Hrs',    value: fmtH(totalHours) },
+    { label: 'Total Cost', value: fmt$(totalCost) },
+    { label: 'Breakeven',  value: fmtP(breakeven) },
+    { label: 'Subtotal',   value: fmt$(subtotal) },
+    { label: 'Total Price',value: fmt$(subtotal) },
+    { label: 'Net Profit', value: fmt$(profit), color: profit >= 0 ? '#22c55e' : '#ef4444' },
+    { label: 'Profit %',   value: fmtP(profitPct), color: profitPct >= 30 ? '#22c55e' : profitPct >= 15 ? '#f59e0b' : '#ef4444' },
+  ];
+  return (
+    <div style={{ display:'flex', background:'#1e293b', borderRadius:8, overflow:'hidden', margin:'0 0 16px 0' }}>
+      {cells.map((c,i) => (
+        <div key={i} style={{ flex:1, padding:'10px 12px', borderRight: i < cells.length-1 ? '1px solid #334155' : 'none', textAlign:'center' }}>
+          <div style={{ fontSize:11, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 }}>{c.label}</div>
+          <div style={{ fontSize:15, fontWeight:700, color: c.color || '#f1f5f9' }}>{c.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WorkAreaSummaryRow({ name, items, onClick, isOpen }) {
+  const hrs   = items.reduce((s,i) => s + (parseFloat(i.hours)||0), 0);
+  const cogs  = items.reduce((s,i) => s + (parseFloat(i.unit_cost)||0)*(parseFloat(i.quantity)||1), 0);
+  const price = items.reduce((s,i) => s + (parseFloat(i.unit_price)||0)*(parseFloat(i.quantity)||1), 0);
+  const pctN  = price > 0 ? ((price-cogs)/price)*100 : 0;
+  const pct   = fmtP(pctN);
+  const pctCol= pctN >= 30 ? '#22c55e' : pctN >= 15 ? '#f59e0b' : '#ef4444';
+  return (
+    <div onClick={onClick} style={{
+      display:'grid', gridTemplateColumns:'32px 1fr 80px 110px 110px 70px',
+      alignItems:'center', gap:8, padding:'10px 12px', cursor:'pointer',
+      background: isOpen ? '#1e3a5f' : '#1e293b',
+      borderRadius:6, marginBottom:4,
+      border: '1px solid ' + (isOpen ? '#3b82f6' : '#334155'),
+      userSelect:'none'
+    }}>
+      <span style={{ color:'#94a3b8', fontSize:16 }}>{isOpen ? '▾' : '▸'}</span>
+      <span style={{ color:'#f1f5f9', fontWeight:600 }}>{name || '(unnamed area)'}</span>
+      <span style={{ color:'#94a3b8', textAlign:'right', fontSize:13 }}>{fmtH(hrs)}</span>
+      <span style={{ color:'#94a3b8', textAlign:'right', fontSize:13 }}>{fmt$(cogs)}</span>
+      <span style={{ color:'#f1f5f9', fontWeight:600, textAlign:'right' }}>{fmt$(price)}</span>
+      <span style={{ color:pctCol, fontWeight:700, textAlign:'right' }}>{pct}</span>
+    </div>
+  );
+}
+
+function LineItemRow({ item, onChange, onDelete }) {
+  const inputStyle = {
+    background:'transparent', border:'none', borderBottom:'1px solid #334155',
+    color:'#f1f5f9', padding:'4px 6px', width:'100%', fontSize:13, outline:'none',
+  };
+  const lineTotal = (parseFloat(item.unit_price)||0)*(parseFloat(item.quantity)||1);
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'3fr 1fr 1fr 1fr 1fr 1fr 90px 32px', gap:6, alignItems:'center', padding:'6px 8px', borderBottom:'1px solid #1e293b' }}>
+      <input value={item.description||''} placeholder="Description" onChange={e=>onChange('description',e.target.value)} style={inputStyle} />
+      <input type="number" value={item.quantity||''} placeholder="Qty" onChange={e=>onChange('quantity',e.target.value)} style={inputStyle} />
+      <select value={item.unit||'each'} onChange={e=>onChange('unit',e.target.value)} style={{ ...inputStyle, background:'#0f172a' }}>
+        {UNITS.map(u=><option key={u} value={u}>{u}</option>)}
+      </select>
+      <input type="number" value={item.hours||''} placeholder="Hrs" onChange={e=>onChange('hours',e.target.value)} style={inputStyle} />
+      <input type="number" value={item.unit_cost||''} placeholder="Cost" onChange={e=>onChange('unit_cost',e.target.value)} style={inputStyle} />
+      <input type="number" value={item.unit_price||''} placeholder="Price" onChange={e=>onChange('unit_price',e.target.value)} style={inputStyle} />
+      <span style={{ color:'#94a3b8', fontSize:13, textAlign:'right', paddingRight:6 }}>{fmt$(lineTotal)}</span>
+      <button onClick={onDelete} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer', fontSize:16, padding:0 }}>×</button>
+    </div>
+  );
+}
+
+function WorkArea({ name, items, onRename, onAddItem, onChangeItem, onDeleteItem, onDelete, profitPct, setProfitPct, isOpen, onToggle }) {
+  return (
+    <div style={{ marginBottom:8 }}>
+      <WorkAreaSummaryRow name={name} items={items} onClick={onToggle} isOpen={isOpen} />
+      {isOpen && (
+        <div style={{ background:'#0f172a', border:'1px solid #334155', borderRadius:6, marginBottom:4 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 12px', borderBottom:'1px solid #1e293b' }}>
+            <input value={name} onChange={e=>onRename(e.target.value)} placeholder="Work Area Name"
+              style={{ flex:1, background:'#1e293b', border:'1px solid #334155', borderRadius:4, color:'#f1f5f9', padding:'6px 10px', fontSize:14 }} />
+            <label style={{ color:'#94a3b8', fontSize:13 }}>Profit %</label>
+            <input type="number" value={profitPct} onChange={e=>setProfitPct(parseFloat(e.target.value)||0)}
+              style={{ width:60, background:'#1e293b', border:'1px solid #334155', borderRadius:4, color:'#f1f5f9', padding:'6px 8px', fontSize:13 }} />
+            <button onClick={onDelete} style={{ background:'none', border:'1px solid #ef4444', borderRadius:4, color:'#ef4444', padding:'4px 10px', cursor:'pointer', fontSize:12 }}>Remove Area</button>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'3fr 1fr 1fr 1fr 1fr 1fr 90px 32px', gap:6, padding:'6px 8px', borderBottom:'1px solid #1e293b' }}>
+            {['Description','Qty','Unit','Hrs','Unit Cost','Unit Price','Total',''].map((h,i) => (
+              <span key={i} style={{ color:'#64748b', fontSize:11, textTransform:'uppercase', letterSpacing:'0.04em' }}>{h}</span>
+            ))}
+          </div>
+          {items.map((item, idx) => (
+            <LineItemRow key={idx} item={item}
+              onChange={(k,v) => onChangeItem(idx, k, v)}
+              onDelete={() => onDeleteItem(idx)} />
+          ))}
+          <div style={{ padding:'8px 12px' }}>
+            <button onClick={onAddItem} style={{
+              background:'none', border:'1px dashed #334155', borderRadius:4,
+              color:'#3b82f6', padding:'6px 16px', cursor:'pointer', fontSize:13, width:'100%'
+            }}>+ Add Line Item</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Estimates() {
-  const [estimates, setEstimates] = useState([]);
-  const [companies, setCompanies] = useState([]);
-  const [pricebook, setPricebook] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [view, setView] = useState('list'); // 'list' | 'builder'
-  const [editing, setEditing] = useState(null); // null = new, id = editing
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const isNew = !id || id === 'new';
 
-  // Builder form state
+  const [tab, setTab] = useState('customer');
+  const [loading, setLoading] = useState(!isNew);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
-    company_id: '', property_id: '', title: '', notes: '', tax_rate: 0, valid_until: '', items: []
+    title:'', estimate_number:'', status:'draft', valid_until:'',
+    division:'', salesperson:'', confidence:50, notes:'', tax_rate:0,
+    company_id:'', property_id:'', contact_id:'',
   });
+  const [items, setItems] = useState([]);
+  const [openAreas, setOpenAreas] = useState({});
+  const [areaProfitPcts, setAreaProfitPcts] = useState({});
+  const [companies, setCompanies] = useState([]);
   const [properties, setProperties] = useState([]);
+  const [contacts, setContacts] = useState([]);
+  const [estimates, setEstimates] = useState([]);
+  const [listView, setListView] = useState(isNew);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    fetch(`${API}/companies`).then(r=>r.json()).then(d=>setCompanies(Array.isArray(d)?d:[])).catch(()=>{});
+    fetch(`${API}/contacts`).then(r=>r.json()).then(d=>setContacts(Array.isArray(d)?d:[])).catch(()=>{});
+    if (!isNew) {
+      setLoading(true);
+      fetch(`${API}/estimates/${id}`).then(r=>r.json()).then(data => {
+        const { items: its, ...est } = data;
+        setForm(f => ({ ...f, ...est }));
+        setItems(its || []);
+        setLoading(false);
+      }).catch(() => setLoading(false));
+    } else {
+      fetch(`${API}/estimates`).then(r=>r.json()).then(d=>setEstimates(Array.isArray(d)?d:[])).catch(()=>{});
+    }
+  }, [id, isNew]);
+
   useEffect(() => {
     if (form.company_id) {
-      axios.get(`/api/properties?company_id=${form.company_id}`).then(r => setProperties(r.data)).catch(() => setProperties([]));
-    } else { setProperties([]); }
+      fetch(`${API}/properties?company_id=${form.company_id}`).then(r=>r.json()).then(d=>setProperties(Array.isArray(d)?d:[])).catch(()=>{});
+    }
   }, [form.company_id]);
 
-  async function load() {
-    setLoading(true);
-    try {
-      const [eRes, cRes, pbRes] = await Promise.all([
-        axios.get('/api/estimates'),
-        axios.get('/api/companies'),
-        axios.get('/api/pricebook'),
-      ]);
-      setEstimates(eRes.data);
-      setCompanies(cRes.data);
-      setPricebook(pbRes.data);
-    } catch (e) { console.error(e); }
-    setLoading(false);
+  const workAreas = [...new Set(items.map(i => i.category || ''))].filter(Boolean);
+  const allAreaNames = workAreas.length ? workAreas : [];
+
+  function getAreaItems(areaName) {
+    return items.filter(i => (i.category||'') === areaName);
   }
 
-  function openNew() {
-    setEditing(null);
-    setForm({ company_id: '', property_id: '', title: '', notes: '', tax_rate: 0, valid_until: '', items: [] });
-    setView('builder');
+  function handleAddArea() {
+    const name = `Work Area ${allAreaNames.length + 1}`;
+    setItems(prev => [...prev, { description:'', category:name, quantity:1, unit:'each', unit_price:0, unit_cost:0, hours:0 }]);
+    setOpenAreas(prev => ({ ...prev, [name]: true }));
   }
 
-  async function openEdit(id) {
-    try {
-      const r = await axios.get(`/api/estimates/${id}`);
-      const e = r.data;
-      setEditing(id);
-      setForm({
-        company_id: e.company_id || '',
-        property_id: e.property_id || '',
-        title: e.title,
-        notes: e.notes || '',
-        tax_rate: e.tax_rate || 0,
-        valid_until: e.valid_until || '',
-        status: e.status,
-        items: (e.items || []).map(it => ({ ...it })),
-      });
-      setView('builder');
-    } catch (e) { alert('Failed to load estimate'); }
-  }
-
-  async function saveEstimate() {
-    try {
-      const payload = { ...form };
-      if (editing) {
-        await axios.put(`/api/estimates/${editing}`, payload);
-      } else {
-        await axios.post('/api/estimates', payload);
-      }
-      setView('list');
-      load();
-    } catch (e) { alert(e.response?.data?.error || 'Save failed'); }
-  }
-
-  async function convertToJob(id) {
-    if (!window.confirm('Convert this estimate to a job?')) return;
-    try {
-      await axios.post(`/api/estimates/${id}/convert`);
-      load();
-    } catch (e) { alert('Conversion failed'); }
-  }
-
-  async function updateStatus(id, status) {
-    try {
-      await axios.put(`/api/estimates/${id}`, { status });
-      setEstimates(prev => prev.map(e => e.id === id ? { ...e, status } : e));
-    } catch (e) { alert('Update failed'); }
-  }
-
-  async function deleteEstimate(id) {
-    if (!window.confirm('Delete this estimate?')) return;
-    try { await axios.delete(`/api/estimates/${id}`); load(); } catch (e) { alert('Delete failed'); }
-  }
-
-  // ── Line item helpers ──
-  function addItem() {
-    setForm(f => ({ ...f, items: [...f.items, { description: '', category: '', quantity: 1, unit: 'each', unit_price: 0, total: 0 }] }));
-  }
-
-  function addFromPricebook(pb) {
-    setForm(f => ({
-      ...f,
-      items: [...f.items, {
-        pricebook_item_id: pb.id,
-        description: pb.name,
-        category: pb.category || '',
-        quantity: 1,
-        unit: pb.unit || 'each',
-        unit_price: pb.unit_price || 0,
-        total: pb.unit_price || 0,
-      }]
-    }));
-  }
-
-  function updateItem(idx, field, value) {
-    setForm(f => {
-      const items = f.items.map((it, i) => {
-        if (i !== idx) return it;
-        const updated = { ...it, [field]: value };
-        if (field === 'quantity' || field === 'unit_price') {
-          updated.total = (parseFloat(updated.quantity) || 0) * (parseFloat(updated.unit_price) || 0);
-        }
-        return updated;
-      });
-      return { ...f, items };
+  function handleRenameArea(oldName, newName) {
+    setItems(prev => prev.map(i => i.category === oldName ? { ...i, category: newName } : i));
+    setOpenAreas(prev => {
+      const next = { ...prev };
+      if (prev[oldName] !== undefined) { next[newName] = next[oldName]; delete next[oldName]; }
+      return next;
     });
   }
 
-  function removeItem(idx) {
-    setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
+  function handleAddItem(areaName) {
+    setItems(prev => [...prev, { description:'', category:areaName, quantity:1, unit:'each', unit_price:0, unit_cost:0, hours:0 }]);
   }
 
-  const subtotal = form.items.reduce((s, it) => s + ((parseFloat(it.quantity) || 0) * (parseFloat(it.unit_price) || 0)), 0);
-  const taxAmt = subtotal * ((parseFloat(form.tax_rate) || 0) / 100);
-  const total = subtotal + taxAmt;
+  function handleChangeItem(areaName, localIdx, key, value) {
+    const areaItems = items.map((it, i) => ({ it, i })).filter(x => (x.it.category||'') === areaName);
+    const globalIdx = areaItems[localIdx].i;
+    setItems(prev => prev.map((it, i) => i === globalIdx ? { ...it, [key]: value } : it));
+  }
 
-  const filtered = estimates.filter(e => {
-    const matchSearch = !search || e.title?.toLowerCase().includes(search.toLowerCase()) || e.company_name?.toLowerCase().includes(search.toLowerCase()) || e.estimate_number?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || e.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  function handleDeleteItem(areaName, localIdx) {
+    const areaItems = items.map((it, i) => ({ it, i })).filter(x => (x.it.category||'') === areaName);
+    const globalIdx = areaItems[localIdx].i;
+    setItems(prev => prev.filter((_, i) => i !== globalIdx));
+  }
 
-  const totals = { all: 0, draft: 0, sent: 0, approved: 0 };
-  estimates.forEach(e => { totals.all += e.total || 0; if (totals[e.status] !== undefined) totals[e.status] += e.total || 0; });
+  function handleDeleteArea(areaName) {
+    setItems(prev => prev.filter(i => i.category !== areaName));
+  }
 
-  if (view === 'builder') return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => setView('list')} className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-          ← Estimates
-        </button>
-        <span className="text-gray-400">/</span>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-          {editing ? 'Edit Estimate' : 'New Estimate'}
-        </h1>
-      </div>
+  async function handleSave() {
+    setSaving(true); setError('');
+    try {
+      const payload = { ...form, items };
+      const url = isNew ? `${API}/estimates` : `${API}/estimates/${id}`;
+      const method = isNew ? 'POST' : 'PUT';
+      const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Save failed');
+      if (isNew) navigate(`/estimates/${data.id}`);
+    } catch(e) { setError(e.message); }
+    setSaving(false);
+  }
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: form */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Header fields */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Title *</label>
-              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-green-500 outline-none"
-                placeholder="e.g. Spring Lawn Maintenance" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Client</label>
-                <select value={form.company_id} onChange={e => setForm(f => ({ ...f, company_id: e.target.value, property_id: '' }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-green-500 outline-none">
-                  <option value="">Select client…</option>
-                  {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Property</label>
-                <select value={form.property_id} onChange={e => setForm(f => ({ ...f, property_id: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-green-500 outline-none"
-                  disabled={!form.company_id}>
-                  <option value="">Select property…</option>
-                  {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Valid Until</label>
-                <input type="date" value={form.valid_until} onChange={e => setForm(f => ({ ...f, valid_until: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-green-500 outline-none" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate (%)</label>
-                <input type="number" value={form.tax_rate} onChange={e => setForm(f => ({ ...f, tax_rate: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-green-500 outline-none"
-                  min="0" max="30" step="0.1" />
-              </div>
-            </div>
-          </div>
+  if (loading) return <div style={{ color:'#94a3b8', padding:40, textAlign:'center' }}>Loading…</div>;
 
-          {/* Line items */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Line Items</h2>
-              <button onClick={addItem} className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 dark:text-green-400 font-medium">
-                <Plus size={14} /> Add Line
-              </button>
-            </div>
-
-            {form.items.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-6">No items yet — add from pricebook or manually</p>
-            )}
-
-            {form.items.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-12 gap-2 mb-2 items-center">
-                <div className="col-span-4">
-                  <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)}
-                    className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs outline-none focus:ring-1 focus:ring-green-500"
-                    placeholder="Description" />
-                </div>
-                <div className="col-span-2">
-                  <input value={item.quantity} type="number" min="0" onChange={e => updateItem(idx, 'quantity', e.target.value)}
-                    className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs outline-none focus:ring-1 focus:ring-green-500"
-                    placeholder="Qty" />
-                </div>
-                <div className="col-span-2">
-                  <input value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)}
-                    className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs outline-none focus:ring-1 focus:ring-green-500"
-                    placeholder="Unit" />
-                </div>
-                <div className="col-span-2">
-                  <input value={item.unit_price} type="number" min="0" onChange={e => updateItem(idx, 'unit_price', e.target.value)}
-                    className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs outline-none focus:ring-1 focus:ring-green-500"
-                    placeholder="Price" />
-                </div>
-                <div className="col-span-1 text-right text-xs text-gray-500 dark:text-gray-400">
-                  {fmt((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0))}
-                </div>
-                <div className="col-span-1 text-right">
-                  <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600"><Trash2 size={13} /></button>
-                </div>
-              </div>
+  if (isNew && listView) {
+    return (
+      <div style={{ padding:24, maxWidth:1100, margin:'0 auto' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+          <h2 style={{ color:'#f1f5f9', margin:0, fontSize:22, fontWeight:700 }}>Estimates</h2>
+          <button onClick={() => setListView(false)}
+            style={{ background:'#3b82f6', border:'none', borderRadius:6, color:'#fff', padding:'8px 20px', cursor:'pointer', fontSize:14, fontWeight:600 }}>
+            + New Estimate
+          </button>
+        </div>
+        <div style={{ background:'#1e293b', borderRadius:8, overflow:'hidden' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'130px 2fr 1fr 1fr 1fr 100px', gap:12, padding:'10px 16px', borderBottom:'1px solid #334155' }}>
+            {['Estimate #','Title','Client','Status','Total','Date'].map(h => (
+              <span key={h} style={{ color:'#64748b', fontSize:11, textTransform:'uppercase', letterSpacing:'0.05em' }}>{h}</span>
             ))}
-
-            {form.items.length > 0 && (
-              <div className="border-t border-gray-200 dark:border-gray-700 mt-4 pt-3 space-y-1 text-sm text-right">
-                <div className="flex justify-between text-gray-500 dark:text-gray-400"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-                {parseFloat(form.tax_rate) > 0 && <div className="flex justify-between text-gray-500 dark:text-gray-400"><span>Tax ({form.tax_rate}%)</span><span>{fmt(taxAmt)}</span></div>}
-                <div className="flex justify-between font-semibold text-gray-900 dark:text-white text-base pt-1 border-t border-gray-200 dark:border-gray-700"><span>Total</span><span>{fmt(total)}</span></div>
-              </div>
-            )}
           </div>
-
-          {/* Notes */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Notes / Scope of Work</label>
-            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={4}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none"
-              placeholder="Describe the scope of work, exclusions, terms…" />
-          </div>
-
-          <div className="flex gap-3">
-            <button onClick={saveEstimate} className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors">
-              {editing ? 'Save Changes' : 'Create Estimate'}
-            </button>
-            <button onClick={() => setView('list')} className="px-6 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-              Cancel
-            </button>
-          </div>
-        </div>
-
-        {/* Right: Pricebook quick-add */}
-        <div className="space-y-3">
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Add from Pricebook</h3>
-            <div className="space-y-1 max-h-80 overflow-y-auto">
-              {pricebook.length === 0 && <p className="text-xs text-gray-400 text-center py-3">No pricebook items</p>}
-              {pricebook.map(pb => (
-                <button key={pb.id} onClick={() => addFromPricebook(pb)}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-gray-800 dark:text-gray-200 group-hover:text-green-600">{pb.name}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{fmt(pb.unit_price)}</span>
-                  </div>
-                  {pb.category && <span className="text-xs text-gray-400">{pb.category}</span>}
-                </button>
-              ))}
+          {estimates.length === 0 && (
+            <div style={{ padding:40, textAlign:'center', color:'#64748b' }}>No estimates yet. Create your first one!</div>
+          )}
+          {estimates.map(e => (
+            <div key={e.id} onClick={() => navigate(`/estimates/${e.id}`)} style={{
+              display:'grid', gridTemplateColumns:'130px 2fr 1fr 1fr 1fr 100px',
+              gap:12, padding:'12px 16px', borderBottom:'1px solid #0f172a', cursor:'pointer',
+            }}
+              onMouseEnter={ev=>ev.currentTarget.style.background='#263548'}
+              onMouseLeave={ev=>ev.currentTarget.style.background='transparent'}>
+              <span style={{ color:'#3b82f6', fontWeight:600, fontSize:13 }}>{e.estimate_number}</span>
+              <span style={{ color:'#f1f5f9' }}>{e.title}</span>
+              <span style={{ color:'#94a3b8' }}>{e.company_name || '—'}</span>
+              <span>
+                <span style={{
+                  background: e.status==='approved'?'#14532d':e.status==='sent'?'#1e3a5f':e.status==='rejected'?'#450a0a':'#1e293b',
+                  color: e.status==='approved'?'#4ade80':e.status==='sent'?'#60a5fa':e.status==='rejected'?'#f87171':'#94a3b8',
+                  borderRadius:12, padding:'2px 10px', fontSize:12
+                }}>{e.status}</span>
+              </span>
+              <span style={{ color:'#f1f5f9', fontWeight:600 }}>{fmt$(e.total)}</span>
+              <span style={{ color:'#64748b', fontSize:12 }}>{e.created_at ? new Date(e.created_at).toLocaleDateString() : '—'}</span>
             </div>
-          </div>
+          ))}
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  const f = (k) => (e) => setForm(prev => ({ ...prev, [k]: e.target.value }));
+  const inputStyle = {
+    background:'#0f172a', border:'1px solid #334155', borderRadius:6,
+    color:'#f1f5f9', padding:'8px 12px', fontSize:14, width:'100%', boxSizing:'border-box',
+  };
+  const labelStyle = { color:'#94a3b8', fontSize:12, marginBottom:4, display:'block', textTransform:'uppercase', letterSpacing:'0.04em' };
+  const fieldStyle = { marginBottom:16 };
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Estimates</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{estimates.length} estimates · {fmt(totals.all)} total value</p>
-        </div>
-        <button onClick={openNew} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm">
-          <Plus size={16} /> New Estimate
-        </button>
+    <div style={{ padding:24, maxWidth:1200, margin:'0 auto' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
+        <button onClick={() => navigate('/estimates')} style={{ background:'none', border:'none', color:'#3b82f6', cursor:'pointer', fontSize:14, padding:0 }}>← Estimates</button>
+        <h2 style={{ color:'#f1f5f9', margin:0, fontSize:20, fontWeight:700, flex:1 }}>
+          {isNew ? 'New Estimate' : (form.estimate_number || 'Edit Estimate')}
+        </h2>
+        {!isNew && (
+          <select value={form.status} onChange={f('status')} style={{ ...inputStyle, width:'auto' }}>
+            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
+        <button onClick={handleSave} disabled={saving} style={{
+          background:'#3b82f6', border:'none', borderRadius:6, color:'#fff',
+          padding:'8px 24px', cursor:'pointer', fontSize:14, fontWeight:600,
+          opacity: saving ? 0.6 : 1
+        }}>{saving ? 'Saving…' : 'Save'}</button>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Draft', key: 'draft', icon: FileText, color: 'text-gray-500' },
-          { label: 'Sent', key: 'sent', icon: Send, color: 'text-blue-500' },
-          { label: 'Approved', key: 'approved', icon: CheckCircle, color: 'text-green-500' },
-          { label: 'Rejected', key: 'rejected', icon: XCircle, color: 'text-red-500' },
-        ].map(s => {
-          const count = estimates.filter(e => e.status === s.key).length;
-          return (
-            <button key={s.key} onClick={() => setStatusFilter(statusFilter === s.key ? 'all' : s.key)}
-              className={`bg-white dark:bg-gray-800 rounded-xl border p-4 text-left transition-all ${statusFilter === s.key ? 'border-green-500 ring-1 ring-green-500' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <s.icon size={16} className={s.color} />
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{s.label}</span>
+      {error && <div style={{ background:'#450a0a', border:'1px solid #ef4444', borderRadius:6, color:'#fca5a5', padding:'10px 14px', marginBottom:16 }}>{error}</div>}
+
+      <div style={{ display:'flex', gap:0, marginBottom:20, borderBottom:'1px solid #334155' }}>
+        {[{ key:'customer', label:'Customer Info' }, { key:'workareas', label:'Workareas & Pricing' }].map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)} style={{
+            background:'none', border:'none',
+            borderBottom: tab===t.key ? '2px solid #3b82f6' : '2px solid transparent',
+            color: tab===t.key ? '#3b82f6' : '#94a3b8',
+            padding:'10px 20px', cursor:'pointer', fontSize:14, fontWeight:600,
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === 'customer' && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
+          <div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Project Name / Title</label>
+              <input value={form.title} onChange={f('title')} placeholder="e.g. Spring Lawn Maintenance" style={inputStyle} />
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Estimate #</label>
+                <input value={form.estimate_number||''} onChange={f('estimate_number')} placeholder="Auto-assigned" style={inputStyle} />
               </div>
-              <div className="text-xl font-bold text-gray-900 dark:text-white">{count}</div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Search + filter */}
-      <div className="flex gap-3 mb-4">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-green-500"
-            placeholder="Search estimates…" />
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Date</label>
+                <input type="date" value={form.valid_until||''} onChange={f('valid_until')} style={inputStyle} />
+              </div>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Division</label>
+              <select value={form.division||''} onChange={f('division')} style={inputStyle}>
+                <option value="">Select division…</option>
+                {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Status</label>
+              <select value={form.status} onChange={f('status')} style={inputStyle}>
+                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Salesperson</label>
+              <input value={form.salesperson||''} onChange={f('salesperson')} placeholder="Salesperson name" style={inputStyle} />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Confidence: {form.confidence}%</label>
+              <input type="range" min={0} max={100} value={form.confidence||50}
+                onChange={e=>setForm(p=>({...p,confidence:parseInt(e.target.value)}))}
+                style={{ width:'100%', accentColor:'#3b82f6' }} />
+              <div style={{ display:'flex', justifyContent:'space-between', color:'#64748b', fontSize:11, marginTop:2 }}>
+                <span>0% Unlikely</span><span>50% Possible</span><span>100% Sure</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Client (Company)</label>
+              <select value={form.company_id||''} onChange={f('company_id')} style={inputStyle}>
+                <option value="">Select client…</option>
+                {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Property</label>
+              <select value={form.property_id||''} onChange={f('property_id')} style={inputStyle}>
+                <option value="">Select property…</option>
+                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Contact</label>
+              <select value={form.contact_id||''} onChange={f('contact_id')} style={inputStyle}>
+                <option value="">Select contact…</option>
+                {contacts.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Notes</label>
+              <textarea value={form.notes||''} onChange={f('notes')} rows={5} placeholder="Additional notes…"
+                style={{ ...inputStyle, resize:'vertical', fontFamily:'inherit' }} />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Tax Rate (%)</label>
+              <input type="number" value={form.tax_rate||0} onChange={f('tax_rate')} min={0} max={100} step={0.1} style={inputStyle} />
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Table */}
-      {loading ? (
-        <div className="text-center py-16 text-gray-400">Loading…</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <FileText size={40} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
-          <p className="text-gray-500 dark:text-gray-400 mb-4">No estimates yet</p>
-          <button onClick={openNew} className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Create Your First Estimate</button>
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Estimate</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Client</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {filtered.map(e => {
-                const sc = STATUS_CONFIG[e.status] || STATUS_CONFIG.draft;
-                return (
-                  <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 dark:text-white">{e.title}</div>
-                      <div className="text-xs text-gray-400">{e.estimate_number} · {new Date(e.created_at).toLocaleDateString()}</div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{e.company_name || '—'}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${sc.color}`}>{sc.label}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">{fmt(e.total)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openEdit(e.id)} className="p-1.5 text-gray-400 hover:text-blue-600 rounded" title="Edit"><Edit2 size={14} /></button>
-                        {e.status === 'draft' && (
-                          <button onClick={() => updateStatus(e.id, 'sent')} className="p-1.5 text-gray-400 hover:text-blue-600 rounded" title="Mark Sent"><Send size={14} /></button>
-                        )}
-                        {e.status === 'sent' && (
-                          <button onClick={() => updateStatus(e.id, 'approved')} className="p-1.5 text-gray-400 hover:text-green-600 rounded" title="Mark Approved"><CheckCircle size={14} /></button>
-                        )}
-                        {(e.status === 'approved') && (
-                          <button onClick={() => convertToJob(e.id)} className="p-1.5 text-gray-400 hover:text-purple-600 rounded" title="Convert to Job"><Hammer size={14} /></button>
-                        )}
-                        <button onClick={() => deleteEstimate(e.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded" title="Delete"><Trash2 size={14} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {tab === 'workareas' && (
+        <div>
+          <SummaryBar items={items} />
+          <div style={{ display:'flex', gap:10, marginBottom:16 }}>
+            <button onClick={handleAddArea} style={{
+              background:'#3b82f6', border:'none', borderRadius:6, color:'#fff',
+              padding:'8px 18px', cursor:'pointer', fontSize:13, fontWeight:600
+            }}>+ Add Work Area</button>
+          </div>
+          {allAreaNames.length > 0 && (
+            <div style={{ display:'grid', gridTemplateColumns:'32px 1fr 80px 110px 110px 70px', gap:8, padding:'0 12px', marginBottom:4 }}>
+              {['','Work Area','Hrs','COGS','Price','Profit%'].map((h,i) => (
+                <span key={i} style={{ color:'#64748b', fontSize:11, textTransform:'uppercase', letterSpacing:'0.04em', textAlign: i > 1 ? 'right' : 'left' }}>{h}</span>
+              ))}
+            </div>
+          )}
+          {allAreaNames.map(areaName => (
+            <WorkArea key={areaName}
+              name={areaName}
+              items={getAreaItems(areaName)}
+              isOpen={!!openAreas[areaName]}
+              onToggle={() => setOpenAreas(p => ({ ...p, [areaName]: !p[areaName] }))}
+              profitPct={areaProfitPcts[areaName] || 30}
+              setProfitPct={(v) => setAreaProfitPcts(p => ({ ...p, [areaName]: v }))}
+              onRename={(newName) => handleRenameArea(areaName, newName)}
+              onAddItem={() => handleAddItem(areaName)}
+              onChangeItem={(idx, k, v) => handleChangeItem(areaName, idx, k, v)}
+              onDeleteItem={(idx) => handleDeleteItem(areaName, idx)}
+              onDelete={() => handleDeleteArea(areaName)}
+            />
+          ))}
+          {items.length === 0 && (
+            <div style={{ padding:48, textAlign:'center', color:'#64748b', background:'#1e293b', borderRadius:8 }}>
+              No work areas yet. Click <strong style={{color:'#3b82f6'}}>+ Add Work Area</strong> to get started.
+            </div>
+          )}
         </div>
       )}
     </div>
