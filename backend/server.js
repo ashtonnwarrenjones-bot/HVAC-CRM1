@@ -56,7 +56,6 @@ app.use('/api/service-requests', requireAuth, demoGuard, require('./routes/servi
 app.use('/api/sms', requireAuth, demoGuard, require('./routes/sms'));
 app.use('/api/search', requireAuth, require('./routes/search'));
 app.use('/api/mobile', requireAuth, require('./routes/mobile'));
-app.use('/api/integrations', requireAuth, demoGuard, require('./routes/integrations'));
 app.use('/api/vendors', requireAuth, demoGuard, require('./routes/vendors'));
 app.use('/api/quickbooks', requireAuth, demoGuard, qbRouter);
 app.use('/api/divvy', requireAuth, demoGuard, require('./routes/divvy'));
