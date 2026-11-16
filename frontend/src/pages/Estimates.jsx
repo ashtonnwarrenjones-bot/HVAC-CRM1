@@ -329,6 +329,272 @@ function WorkAreaRow({ name, items, costCode, isOpen, onToggle, onRename, onChan
   );
 }
 
+// ── Print Reports Tab ─────────────────────────────────────────────────────────
+const REPORT_TYPES = [
+  { value:'', label:'-- Select a report --' },
+  { value:'CustomerProposal', label:'Customer Proposal' },
+  { value:'EstimateReview', label:'Estimate Review' },
+  { value:'EstimatedJobCost', label:'Estimated Job Cost' },
+  { value:'PurchaseOrder', label:'Purchase Order' },
+  { value:'JobPlannerWorkAreas', label:'Job Planner (Work Areas)' },
+  { value:'JobPlannerShowTotals', label:'Job Planner (Show Totals)' },
+];
+
+function PrintReportsTab({ form, items, contacts, companies, properties }) {
+  const [selectedReport, setSelectedReport] = useState('');
+  const [reportTitle, setReportTitle] = useState('');
+  const [accordions, setAccordions] = useState({ header:false, pricing:false, report:false, footer:false });
+  const [opts, setOpts] = useState({
+    letterheadMode:false, hideSalesperson:false, hideClientEmailPhone:true, hideCustomerName:false,
+    hideWorkAreaPrices:false, hideItemDetails:true, hideTaxes:false, hideGrandTotal:false, hidePaymentSchedule:true,
+    groupAreaOnSamePage:false, hideClientNotes:false, startTermsOnNewPage:false, hideSignatures:false, hideEmail:false,
+    includeEstimateId:false, hidePageFooter:false,
+  });
+  const [saveOpts, setSaveOpts] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const toggleOpt = k => setOpts(p => ({ ...p, [k]:!p[k] }));
+  const toggleAcc = k => setAccordions(p => ({ ...p, [k]:!p[k] }));
+
+  function fmt$(n) { return '$' + (parseFloat(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function fmtH(n)  { return (parseFloat(n)||0).toFixed(2); }
+
+  const workAreas = [...new Set(items.map(i => i.category||''))].filter(Boolean);
+  const getAreaItems = aName => items.filter(i => (i.category||'') === aName);
+  const clientCompany  = companies.find(c => c.id == form.company_id);
+  const clientProperty = properties.find(p => p.id == form.property_id);
+  const clientContact  = contacts.find(c => c.id == form.contact_id);
+
+  function generatePreview() {
+    setLoading(true);
+    setTimeout(() => {
+      const title = reportTitle || form.title || 'Proposal';
+      const estId  = form.estimate_number || '—';
+      const date   = form.valid_until
+        ? new Date(form.valid_until).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+        : new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      const salesperson    = form.salesperson || '—';
+      const companyName    = clientCompany?.name || '—';
+      const companyAddress = clientCompany?.address || '';
+      const propName       = clientProperty?.name || form.title || '';
+      const propAddress    = clientProperty?.address || '';
+      const totalPrice     = items.reduce((s,i) => s + (parseFloat(i.unit_price)||0)*(parseFloat(i.quantity)||1), 0);
+
+      let areaRows = '';
+      workAreas.forEach(aName => {
+        const aItems = getAreaItems(aName);
+        const total  = aItems.reduce((s,i) => s + (parseFloat(i.unit_price)||0)*(parseFloat(i.quantity)||1), 0);
+        if (!opts.hideWorkAreaPrices) {
+          areaRows += `<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:10px 20px;font-size:14px;color:#1e293b;font-weight:500">${aName}</td><td style="padding:10px 20px;font-size:14px;color:#1e293b;text-align:right;font-weight:600">${fmt$(total)}</td></tr>`;
+        }
+        if (!opts.hideItemDetails && !opts.hideWorkAreaPrices) {
+          aItems.forEach(item => {
+            const lp = (parseFloat(item.unit_price)||0)*(parseFloat(item.quantity)||1);
+            areaRows += `<tr style="border-bottom:1px dashed #f1f5f9"><td style="padding:4px 20px 4px 36px;font-size:13px;color:#64748b">${item.description||'Item'}</td><td style="padding:4px 20px;font-size:13px;color:#64748b;text-align:right">${fmt$(lp)}</td></tr>`;
+          });
+        }
+      });
+      if (!areaRows) areaRows = `<tr><td colspan="2" style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">No work areas defined yet.</td></tr>`;
+
+      let reportSpecific = '';
+      if (selectedReport === 'EstimateReview') {
+        const totalCost = items.reduce((s,i) => s + (parseFloat(i.unit_cost)||0)*(parseFloat(i.quantity)||1), 0);
+        const profit = totalPrice - totalCost;
+        const pct = totalPrice > 0 ? ((profit/totalPrice)*100).toFixed(1) : '0.0';
+        reportSpecific = `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px 20px;margin-top:16px;display:flex;gap:32px">
+          <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Total Cost</div><div style="font-size:18px;font-weight:700;color:#1e293b">${fmt$(totalCost)}</div></div>
+          <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Total Price</div><div style="font-size:18px;font-weight:700;color:#1e293b">${fmt$(totalPrice)}</div></div>
+          <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Net Profit</div><div style="font-size:18px;font-weight:700;color:${parseFloat(pct)>=30?'#16a34a':parseFloat(pct)>=15?'#d97706':'#dc2626'}">${fmt$(profit)} (${pct}%)</div></div>
+        </div>`;
+      }
+      if (selectedReport === 'EstimatedJobCost') {
+        const totalCost = items.reduce((s,i) => s + (parseFloat(i.unit_cost)||0)*(parseFloat(i.quantity)||1), 0);
+        const totalHrs  = items.reduce((s,i) => s + (parseFloat(i.hours)||0), 0);
+        reportSpecific = `<div style="margin-top:16px"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase">Item</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase">Qty</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase">Unit Cost</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase">Total Cost</th></tr></thead><tbody>
+          ${items.map(it => `<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:7px 12px;font-size:13px;color:#1e293b">${it.description||'Item'}</td><td style="padding:7px 12px;font-size:13px;text-align:right;color:#64748b">${it.quantity||1}</td><td style="padding:7px 12px;font-size:13px;text-align:right;color:#64748b">${fmt$(it.unit_cost||0)}</td><td style="padding:7px 12px;font-size:13px;text-align:right;color:#1e293b;font-weight:500">${fmt$((parseFloat(it.unit_cost)||0)*(parseFloat(it.quantity)||1))}</td></tr>`).join('')}
+          <tr style="background:#f8fafc;font-weight:700"><td style="padding:9px 12px;font-size:13px" colspan="3">Total Job Cost</td><td style="padding:9px 12px;font-size:14px;text-align:right">${fmt$(totalCost)}</td></tr>
+        </tbody></table></div>`;
+      }
+      if (selectedReport === 'PurchaseOrder') {
+        reportSpecific = `<div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;margin-top:16px"><div style="background:#0f766e;color:#fff;padding:10px 16px;font-size:14px;font-weight:700">PURCHASE ORDER</div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#64748b">Description</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#64748b">Qty</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#64748b">Unit</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#64748b">Unit Cost</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#64748b">Total</th></tr></thead><tbody>
+          ${items.map((it,i) => `<tr style="background:${i%2?'#f8fafc':'#fff'};border-bottom:1px solid #f1f5f9"><td style="padding:7px 12px;font-size:13px;color:#1e293b">${it.description||'Item'}</td><td style="padding:7px 12px;font-size:13px;text-align:right;color:#64748b">${it.quantity||1}</td><td style="padding:7px 12px;font-size:13px;text-align:right;color:#64748b">${it.unit||'units'}</td><td style="padding:7px 12px;font-size:13px;text-align:right;color:#64748b">${fmt$(it.unit_cost||0)}</td><td style="padding:7px 12px;font-size:13px;text-align:right;color:#1e293b;font-weight:500">${fmt$((parseFloat(it.unit_cost)||0)*(parseFloat(it.quantity)||1))}</td></tr>`).join('')}
+        </tbody></table></div>`;
+      }
+      if (selectedReport === 'JobPlannerWorkAreas' || selectedReport === 'JobPlannerShowTotals') {
+        reportSpecific = `<div style="margin-top:16px">${workAreas.map(aName => {
+          const aItems = getAreaItems(aName);
+          const rows = selectedReport === 'JobPlannerShowTotals' ? '' : aItems.map((it,i) => `<tr style="background:${i%2?'#f0fdf4':'#fff'};border-bottom:1px dashed #e2e8f0"><td style="padding:6px 12px 6px 24px;font-size:13px;color:#1e293b">${it.description||'Item'}</td><td style="padding:6px 12px;font-size:13px;text-align:right;color:#64748b">${it.quantity||1} ${it.unit||'units'}</td><td style="padding:6px 12px;font-size:13px;text-align:right;color:#64748b">${fmtH(it.hours||0)} hrs</td></tr>`).join('');
+          const aTotal = aItems.reduce((s,i) => s + (parseFloat(i.unit_price)||0)*(parseFloat(i.quantity)||1), 0);
+          return `<div style="margin-bottom:16px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden"><div style="background:#0f766e;color:#fff;padding:8px 14px;font-size:13px;font-weight:700;display:flex;justify-content:space-between"><span>${aName}</span><span>${fmt$(aTotal)}</span></div><table style="width:100%;border-collapse:collapse"><tbody>${rows||'<tr><td colspan="3" style="padding:10px 12px;color:#94a3b8;font-size:13px">No items</td></tr>'}</tbody></table></div>`;
+        }).join('')}</div>`;
+      }
+
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+        *{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0;background:#fff;color:#1e293b}
+        .page{max-width:760px;margin:0 auto;padding:48px}
+        .logo{color:#e55b2d;font-size:36px;font-weight:900;letter-spacing:-1px;margin-bottom:40px;font-family:Georgia,serif}
+        .hrow{display:flex;justify-content:space-between;margin-bottom:28px;gap:24px}
+        .addr{font-size:13px;line-height:1.7;color:#334155}
+        .addr strong{font-size:14px;color:#1e293b;display:block}
+        .meta{margin-bottom:24px}
+        .meta div{font-size:13px;color:#334155;margin-bottom:3px}
+        .meta dt{font-weight:700;display:inline}
+        .meta dd{display:inline;margin-left:8px}
+        table{width:100%;border-collapse:collapse;margin-bottom:24px}
+        .total-row td{background:#f8fafc;border-top:2px solid #0f766e;padding:12px 20px;font-size:15px;font-weight:700}
+        .sig{margin-top:60px;display:flex;gap:48px}
+        .sig-block{flex:1}
+        .sig-line{border-top:1px solid #334155;padding-top:6px;font-size:12px;color:#64748b;margin-top:40px}
+        @media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+      </style></head><body><div class="page">
+        ${!opts.letterheadMode ? '<div class="logo">mahalo pro</div>' : ''}
+        <div class="hrow">
+          <div class="addr">
+            ${!opts.hideCustomerName ? `<strong>${companyName}</strong>` : ''}
+            ${companyAddress ? `${companyAddress}<br>` : ''}
+            ${propAddress && propAddress !== companyAddress ? propAddress : ''}
+          </div>
+          ${!opts.hideSalesperson ? `<div class="addr" style="text-align:right">
+            <div style="font-size:13px;color:#64748b">Sales: <strong style="color:#1e293b">${salesperson}</strong></div>
+            ${propName ? `<div>${propName}</div>` : ''}
+            ${propAddress ? `<div>${propAddress}</div>` : ''}
+          </div>` : ''}
+        </div>
+        <dl class="meta">
+          ${opts.includeEstimateId ? `<div><dt>Est ID:</dt><dd>${estId}</dd></div>` : ''}
+          <div><dt>Date:</dt><dd>${date}</dd></div>
+        </dl>
+        <table><tbody>${areaRows}</tbody>${!opts.hideGrandTotal?`<tfoot><tr class="total-row"><td>Total</td><td style="text-align:right">${fmt$(totalPrice)}</td></tr></tfoot>`:''}</table>
+        ${reportSpecific}
+        ${!opts.hideSignatures ? `<div class="sig">
+          <div class="sig-block"><div class="sig-line">Client Signature</div><div class="sig-line" style="margin-top:16px">Date</div></div>
+          <div class="sig-block"><div class="sig-line">Authorized Signature</div><div class="sig-line" style="margin-top:16px">Date</div></div>
+        </div>` : ''}
+        ${!opts.hidePageFooter ? `<div style="margin-top:48px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center">Mahalo Pro &nbsp;|&nbsp; Professional Facility Services</div>` : ''}
+      </div></body></html>`;
+      setPreviewHtml(html);
+      setLoading(false);
+    }, 600);
+  }
+
+  const AccordionSection = ({ label, aKey, children }) => (
+    <div style={{ border:'1px solid #cbd5e1', borderRadius:4, marginBottom:8, overflow:'hidden' }}>
+      <button onClick={() => toggleAcc(aKey)} style={{ width:'100%', background:'#f8fafc', border:'none', padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', fontSize:13, fontWeight:700, color:'#1e293b', textTransform:'uppercase', letterSpacing:'0.04em', textAlign:'left' }}>
+        {label}
+        <span style={{ fontSize:14, color:'#94a3b8', display:'inline-block', transform: accordions[aKey]?'rotate(180deg)':'none', transition:'transform 0.2s' }}>▾</span>
+      </button>
+      {accordions[aKey] && <div style={{ padding:'10px 14px 6px', background:'#fff' }}>{children}</div>}
+    </div>
+  );
+
+  const Cb = ({ optKey, label }) => (
+    <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:9, cursor:'pointer', fontSize:13, color:'#334155' }}>
+      <input type="checkbox" checked={!!opts[optKey]} onChange={() => toggleOpt(optKey)} style={{ width:14, height:14, cursor:'pointer' }} />
+      {label}
+    </label>
+  );
+
+  const sel = { background:'#fff', border:'1px solid #cbd5e1', borderRadius:4, padding:'7px 10px', fontSize:13, color:'#1e293b', width:'100%', outline:'none' };
+
+  return (
+    <div style={{ display:'flex', gap:20, minHeight:500 }}>
+      {/* ── Left options panel ── */}
+      <div style={{ width:360, flexShrink:0 }}>
+        <div style={{ marginBottom:14 }}>
+          <label style={{ color:'#64748b', fontSize:12, marginBottom:4, display:'block', fontWeight:500 }}>Select report</label>
+          <select value={selectedReport} onChange={e => { setSelectedReport(e.target.value); setPreviewHtml(''); }} style={sel}>
+            {REPORT_TYPES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </div>
+
+        {selectedReport && (<>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ color:'#64748b', fontSize:12, marginBottom:4, display:'block', fontWeight:500 }}>Report Title</label>
+            <input value={reportTitle} onChange={e => setReportTitle(e.target.value)}
+              style={{ background:'#fff', border:'1px solid #cbd5e1', borderRadius:4, padding:'7px 10px', fontSize:13, color:'#1e293b', width:'100%', boxSizing:'border-box', outline:'none' }} />
+          </div>
+
+          {selectedReport === 'CustomerProposal' && (<>
+            <AccordionSection label="Header Options" aKey="header">
+              <Cb optKey="letterheadMode" label="Letterhead mode" />
+              <Cb optKey="hideSalesperson" label="Hide salesperson" />
+              <Cb optKey="hideClientEmailPhone" label="Hide client email and phone" />
+              <Cb optKey="hideCustomerName" label="Hide customer name" />
+            </AccordionSection>
+            <AccordionSection label="Pricing Options" aKey="pricing">
+              <Cb optKey="hideWorkAreaPrices" label="Hide work area prices" />
+              <Cb optKey="hideItemDetails" label="Hide item details" />
+              <Cb optKey="hideTaxes" label="Hide Taxes" />
+              <Cb optKey="hideGrandTotal" label="Hide grand total" />
+              <Cb optKey="hidePaymentSchedule" label="Hide Payment Schedule" />
+            </AccordionSection>
+            <AccordionSection label="Report Options" aKey="report">
+              <Cb optKey="groupAreaOnSamePage" label="Group area on same page" />
+              <Cb optKey="hideClientNotes" label="Hide client notes" />
+              <Cb optKey="startTermsOnNewPage" label="Start terms on new page" />
+              <Cb optKey="hideSignatures" label="Hide signatures" />
+              <Cb optKey="hideEmail" label="Hide email" />
+            </AccordionSection>
+            <AccordionSection label="Footer Options" aKey="footer">
+              <Cb optKey="includeEstimateId" label="Include Estimate ID" />
+              <Cb optKey="hidePageFooter" label="Hide page footer" />
+            </AccordionSection>
+          </>)}
+
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:14, marginBottom:12 }}>
+            <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:13, color:'#64748b' }}>
+              <input type="checkbox" checked={saveOpts} onChange={e=>setSaveOpts(e.target.checked)} style={{ width:13, height:13, cursor:'pointer' }} />
+              Save report options
+            </label>
+            <button onClick={generatePreview} disabled={loading} style={{ background:'#0f766e', border:'none', borderRadius:4, color:'#fff', padding:'7px 20px', cursor:loading?'default':'pointer', fontSize:13, fontWeight:700, opacity:loading?0.6:1 }}>
+              {loading ? 'Loading…' : 'Preview'}
+            </button>
+          </div>
+
+          {selectedReport === 'CustomerProposal' && (
+            <button style={{ background:'#0f766e', border:'none', borderRadius:4, color:'#fff', padding:'9px 16px', cursor:'pointer', fontSize:13, fontWeight:600, width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              ↑ Email/Publish Proposal
+            </button>
+          )}
+        </>)}
+      </div>
+
+      {/* ── Right preview panel ── */}
+      <div style={{ flex:1, background:'#f1f5f9', border:'1px solid #e2e8f0', borderRadius:6, minHeight:460, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        {previewHtml ? (<>
+          {/* Viewer toolbar */}
+          <div style={{ background:'#334155', padding:'6px 12px', display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+            {['⟨⟨','⟨','⟩','⟩⟩'].map((s,i) => (
+              <button key={i} style={{ background:'#1e293b', border:'1px solid #475569', borderRadius:3, color:'#cbd5e1', padding:'2px 7px', cursor:'pointer', fontSize:12 }}>{s}</button>
+            ))}
+            <span style={{ background:'#1e293b', border:'1px solid #475569', borderRadius:3, padding:'2px 10px', fontSize:12, color:'#cbd5e1' }}>1 of 1</span>
+            <select style={{ background:'#1e293b', border:'1px solid #475569', borderRadius:3, color:'#cbd5e1', padding:'2px 7px', fontSize:12, marginLeft:4 }}>
+              <option>Whole Page</option><option>75%</option><option>100%</option><option>150%</option>
+            </select>
+            <div style={{ flex:1 }} />
+            <button onClick={() => { const w=window.open('','_blank'); w.document.write(previewHtml); w.document.close(); w.print(); }}
+              style={{ background:'#1e293b', border:'1px solid #475569', borderRadius:3, color:'#cbd5e1', padding:'3px 10px', cursor:'pointer', fontSize:12 }}>🖨</button>
+            <button onClick={() => { const w=window.open('','_blank'); w.document.write(previewHtml); w.document.close(); }}
+              style={{ background:'#1e293b', border:'1px solid #475569', borderRadius:3, color:'#cbd5e1', padding:'3px 10px', cursor:'pointer', fontSize:12 }}>⤢</button>
+          </div>
+          <iframe srcDoc={previewHtml} style={{ flex:1, border:'none', background:'#fff' }} title="Report Preview" />
+        </>) : (
+          <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', color:'#94a3b8' }}>
+            {loading
+              ? <div style={{ fontSize:40, animation:'pulse 1s ease infinite' }}>⏳</div>
+              : (<>
+                  <div style={{ fontSize:64, marginBottom:12, opacity:0.3 }}>📄</div>
+                  <div style={{ fontSize:14 }}>Tap on the Preview button to see your report.</div>
+                </>)
+            }
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function Estimates() {
   const { id } = useParams();
@@ -518,7 +784,7 @@ export default function Estimates() {
 
       {/* Tabs */}
       <div style={{ background:'#fff', borderBottom:'1px solid #e2e8f0', padding:'0 24px', display:'flex', overflowX:'auto' }}>
-        {[{ key:'customer', label:'Customer Info' }, { key:'workareas', label:'Workareas + Pricing' }].map(t => (
+        {[{ key:'customer', label:'Customer Info' }, { key:'workareas', label:'Workareas + Pricing' }, { key:'print', label:'Print Reports' }].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             background:'none', border:'none',
             borderBottom: tab===t.key ? '2px solid #0f766e' : '2px solid transparent',
@@ -806,6 +1072,17 @@ export default function Estimates() {
               </table>
             </div>
           </div>
+        )}
+
+        {/* ── Print Reports ──────────────────────────────────────────────── */}
+        {tab === 'print' && (
+          <PrintReportsTab
+            form={form}
+            items={items}
+            contacts={contacts}
+            companies={companies}
+            properties={properties}
+          />
         )}
       </div>
 
