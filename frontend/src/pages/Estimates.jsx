@@ -174,10 +174,12 @@ function WorkAreaRow({ name, items, costCode, isOpen, onToggle, onRename, onChan
 export default function Estimates() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isNew = !id || id === 'new';
+  const isList = !id;
+  const isNew = id === 'new';
+  const isExisting = !!id && id !== 'new';
 
   const [tab, setTab] = useState('customer');
-  const [loading, setLoading] = useState(!isNew);
+  const [loading, setLoading] = useState(isExisting);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
@@ -194,20 +196,22 @@ export default function Estimates() {
   const [estimates, setEstimates] = useState([]);
 
   useEffect(() => {
-    fetch(`${API}/companies`).then(r=>r.json()).then(d=>setCompanies(Array.isArray(d)?d:[])).catch(()=>{});
-    fetch(`${API}/contacts`).then(r=>r.json()).then(d=>setContacts(Array.isArray(d)?d:[])).catch(()=>{});
-    if (!isNew) {
-      setLoading(true);
-      fetch(`${API}/estimates/${id}`).then(r=>r.json()).then(data => {
-        const { items: its, ...est } = data;
-        setForm(f => ({ ...f, ...est }));
-        setItems(its || []);
-        setLoading(false);
-      }).catch(() => setLoading(false));
-    } else {
+    if (isList) {
       fetch(`${API}/estimates`).then(r=>r.json()).then(d=>setEstimates(Array.isArray(d)?d:[])).catch(()=>{});
+    } else {
+      fetch(`${API}/companies`).then(r=>r.json()).then(d=>setCompanies(Array.isArray(d)?d:[])).catch(()=>{});
+      fetch(`${API}/contacts`).then(r=>r.json()).then(d=>setContacts(Array.isArray(d)?d:[])).catch(()=>{});
+      if (isExisting) {
+        setLoading(true);
+        fetch(`${API}/estimates/${id}`).then(r=>r.json()).then(data => {
+          const { items: its, ...est } = data;
+          setForm(f => ({ ...f, ...est }));
+          setItems(its || []);
+          setLoading(false);
+        }).catch(() => setLoading(false));
+      }
     }
-  }, [id, isNew]);
+  }, [id]);
 
   useEffect(() => {
     if (form.company_id) {
@@ -268,8 +272,8 @@ export default function Estimates() {
     setSaving(true); setError('');
     try {
       const payload = { ...form, items };
-      const url = isNew ? `${API}/estimates` : `${API}/estimates/${id}`;
-      const method = isNew ? 'POST' : 'PUT';
+      const url = isExisting ? `${API}/estimates/${id}` : `${API}/estimates`;
+      const method = isExisting ? 'PUT' : 'POST';
       const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Save failed');
@@ -281,12 +285,12 @@ export default function Estimates() {
   if (loading) return <div style={{ color:'#64748b', padding:40, textAlign:'center' }}>Loading…</div>;
 
   // ── List view ──────────────────────────────────────────────────────────────
-  if (isNew) {
+  if (isList) {
     return (
       <div style={{ padding:24, maxWidth:1200, margin:'0 auto' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
           <h2 style={{ color:'#1e293b', margin:0, fontSize:22, fontWeight:700, letterSpacing:'-0.02em' }}>STANDARD ESTIMATES</h2>
-          <button onClick={() => navigate('/estimates/new/edit')}
+          <button onClick={() => navigate('/estimates/new')}
             style={{ background:'#0f766e', border:'none', borderRadius:4, color:'#fff', padding:'8px 20px', cursor:'pointer', fontSize:14, fontWeight:600 }}>
             → New
           </button>

@@ -501,6 +501,7 @@ function AppLayout() {
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/import" element={<Import />} />
           <Route path="/estimates" element={<Estimates />} />
+          <Route path="/estimates/:id" element={<Estimates />} />
           <Route path="/timesheets" element={<Timesheets />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/job-report/:id" element={<JobReport />} />
