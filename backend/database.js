@@ -573,7 +573,41 @@ const SCHEMA_STATEMENTS = [
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+,
+  `CREATE TABLE IF NOT EXISTS invoice_line_items (
+    id SERIAL PRIMARY KEY,
+    invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    description TEXT NOT NULL,
+    quantity REAL DEFAULT 1,
+    unit TEXT DEFAULT 'each',
+    unit_price REAL DEFAULT 0,
+    total REAL DEFAULT 0,
+    sort_order INTEGER DEFAULT 0
+  )`,
+  `CREATE TABLE IF NOT EXISTS routes (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    route_type TEXT DEFAULT 'landscape',
+    scheduled_date DATE,
+    crew_lead TEXT,
+    allocated_hours REAL DEFAULT 8,
+    status TEXT DEFAULT 'draft',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS route_stops (
+    id SERIAL PRIMARY KEY,
+    route_id INTEGER REFERENCES routes(id) ON DELETE CASCADE,
+    job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+    property_id INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+    stop_order INTEGER DEFAULT 0,
+    estimated_drive_min INTEGER DEFAULT 15,
+    estimated_service_min INTEGER DEFAULT 60,
+    notes TEXT
+  )`,
 ];
+
 
 // ─── Demo data seeder ─────────────────────────────────────────────────────────
 
@@ -987,7 +1021,22 @@ async function initDb() {
     "ALTER TABLE estimates ADD COLUMN IF NOT EXISTS confidence INTEGER DEFAULT 50",
     "ALTER TABLE estimate_items ADD COLUMN IF NOT EXISTS unit_cost NUMERIC DEFAULT 0",
     "ALTER TABLE estimate_items ADD COLUMN IF NOT EXISTS hours NUMERIC DEFAULT 0",
-  ];
+  ,
+    // Jobs scheduling fields
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS estimate_id INTEGER REFERENCES estimates(id) ON DELETE SET NULL",
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS property_id INTEGER REFERENCES properties(id) ON DELETE SET NULL",
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS assigned_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type TEXT DEFAULT 'one_time'",
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS unscheduled INTEGER DEFAULT 0",
+    "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS route_id INTEGER",
+    // Invoice QB fields
+    "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS estimate_id INTEGER REFERENCES estimates(id) ON DELETE SET NULL",
+    "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL",
+    "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qb_id TEXT",
+    "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qb_synced_at TIMESTAMP",
+
+];
+
 
   for (const sql of columnMigrations) {
     try { await pool.query(sql); } catch (_) {}
