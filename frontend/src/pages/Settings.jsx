@@ -76,6 +76,11 @@ export default function Settings() {
   const [divvyLoading, setDivvyLoading] = useState(false);
   const [divvySaving,  setDivvySaving]  = useState(false);
 
+  // QuickBooks integration
+  const [qbStatus,   setQbStatus]   = useState(null);
+  const [qbLoading,  setQbLoading]  = useState(false);
+  const [qbSyncing,  setQbSyncing]  = useState(false);
+
   useEffect(() => {
     axios.get('/api/settings').then(r => {
       setForm(f => ({ ...f, ...r.data }));
@@ -91,6 +96,7 @@ export default function Settings() {
   useEffect(() => {
     if (tab !== 'integrations') return;
     loadDivvyStatus();
+    loadQbStatus();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -115,6 +121,33 @@ export default function Settings() {
 
   const disconnectDivvy = async () => {
     try { await axios.post('/api/divvy/config', { api_key: '' }); loadDivvyStatus(); } catch (e) {}
+  };
+
+  const loadQbStatus = () => {
+    setQbLoading(true);
+    axios.get('/api/quickbooks/status')
+      .then(r => setQbStatus(r.data))
+      .catch(() => setQbStatus(null))
+      .finally(() => setQbLoading(false));
+  };
+
+  const connectQB = async () => {
+    try {
+      const r = await axios.get('/api/quickbooks/auth-url');
+      window.location.href = r.data.url;
+    } catch (e) { alert('Failed to get QuickBooks auth URL'); }
+  };
+
+  const disconnectQB = async () => {
+    try { await axios.post('/api/quickbooks/disconnect'); loadQbStatus(); } catch (e) {}
+  };
+
+  const syncAllCustomers = async () => {
+    setQbSyncing(true);
+    try {
+      const r = await axios.post('/api/quickbooks/sync/all-customers');
+      alert(`Synced ${r.data?.synced ?? 0} customers to QuickBooks`);
+    } catch (e) { alert('Sync failed'); } finally { setQbSyncing(false); }
   };
   const createUser = async () => {
     if (!newUser.username || !newUser.password) {
@@ -518,6 +551,76 @@ export default function Settings() {
         {tab === 'integrations' && (
           <>
             {sectionTitle('Integrations', 'Connect external systems to automate data flow between your CRM and accounting software.')}
+
+            {/* ── QuickBooks Online ── */}
+            <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:12, marginBottom:20, overflow:'hidden' }}>
+              {/* Header */}
+              <div style={{ display:'flex', alignItems:'center', gap:14, padding:'18px 22px', borderBottom:'1px solid var(--border)' }}>
+                <div style={{ width:46, height:46, borderRadius:10, background:'#2ca01c', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <span style={{ color:'#fff', fontWeight:900, fontSize:16 }}>QB</span>
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:700, fontSize:15, color:'var(--text-primary)' }}>QuickBooks Online</div>
+                  <div style={{ fontSize:13, color:'var(--text-muted)', marginTop:2 }}>Sync customers, push invoices, auto-update deal status on payment</div>
+                </div>
+                <div>
+                  {qbLoading
+                    ? <span style={{ fontSize:12, color:'var(--text-muted)' }}>Checking…</span>
+                    : <span style={{ fontSize:12, fontWeight:700, padding:'4px 12px', borderRadius:20, background: qbStatus?.connected ? '#dcfce7' : '#f3f4f6', color: qbStatus?.connected ? '#16a34a' : '#6b7280' }}>
+                        {qbStatus?.connected ? '● Connected' : '○ Not connected'}
+                      </span>
+                  }
+                </div>
+              </div>
+
+              {/* What you get */}
+              <div style={{ padding:'14px 22px', background:'#f8fafc', borderBottom:'1px solid var(--border)', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'8px 16px' }}>
+                {[
+                  ['🏢', 'Customer Sync', 'Companies pushed to QB as customers'],
+                  ['🧾', 'Invoice Push', 'Deals become QB invoices automatically'],
+                  ['💰', 'Payment Sync', 'QB payments mark deals as Paid via webhook'],
+                  ['🔄', 'Two-Way', 'Changes in QB reflect back in your CRM'],
+                  ['🔗', 'OAuth Secure', 'No passwords stored — connect via QB login'],
+                  ['📋', 'Mappings', 'Track which CRM records link to QB objects'],
+                ].map(([icon, title, desc]) => (
+                  <div key={title} style={{ display:'flex', gap:8, alignItems:'flex-start' }}>
+                    <span style={{ fontSize:16 }}>{icon}</span>
+                    <div>
+                      <div style={{ fontSize:12, fontWeight:700, color:'var(--text-primary)' }}>{title}</div>
+                      <div style={{ fontSize:11, color:'#6b7280' }}>{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Connection */}
+              <div style={{ padding:'20px 22px' }}>
+                {qbStatus?.connected ? (
+                  <div>
+                    <div style={{ fontSize:14, color:'var(--text-primary)', marginBottom:14 }}>
+                      Connected to <strong>{qbStatus.company_name || 'your QuickBooks company'}</strong>
+                    </div>
+                    <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                      <button onClick={syncAllCustomers} disabled={qbSyncing} style={{ background:'#2ca01c', color:'#fff', border:'none', borderRadius:7, padding:'9px 18px', cursor:'pointer', fontWeight:700, fontSize:13, opacity: qbSyncing ? 0.7 : 1 }}>
+                        {qbSyncing ? 'Syncing…' : '↑ Sync All Customers'}
+                      </button>
+                      <button onClick={disconnectQB} style={{ background:'#fff', color:'#dc2626', border:'1px solid #fca5a5', borderRadius:7, padding:'9px 18px', cursor:'pointer', fontWeight:600, fontSize:13 }}>
+                        Disconnect
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ fontSize:13, color:'var(--text-secondary)', marginBottom:14 }}>
+                      Connect via QuickBooks OAuth — you'll be redirected to log in and approve access.
+                    </div>
+                    <button onClick={connectQB} style={{ background:'#2ca01c', color:'#fff', border:'none', borderRadius:7, padding:'9px 20px', cursor:'pointer', fontWeight:700, fontSize:13 }}>
+                      Connect QuickBooks Online →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* ── Divvy (BILL Spend & Expense) ── */}
             <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:12, marginBottom:20, overflow:'hidden' }}>
