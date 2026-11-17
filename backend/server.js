@@ -106,16 +106,16 @@ app.delete('/api/admin/wipe-all-data', async (req, res) => {
     return res.status(403).json({ error: 'forbidden' });
   }
   try {
-    await db.pool.query(`
-      TRUNCATE TABLE
-        time_entries, crew_members, invoice_items, invoices,
-        estimate_items, estimates, job_photos, job_tasks, jobs,
-        proposal_line_items, proposals, deal_contacts, deals,
-        service_requests, memberships, attachments, pricebook_items,
-        equipment, vendors, notifications, properties, contacts,
-        companies
-      RESTART IDENTITY CASCADE
+    // Get all user-data tables (skip users/sessions)
+    const { rows } = await db.pool.query(`
+      SELECT tablename FROM pg_tables
+      WHERE schemaname = 'public' AND tablename NOT IN ('users','sessions','schema_migrations')
     `);
+    for (const { tablename } of rows) {
+      try {
+        await db.pool.query('TRUNCATE TABLE "' + tablename + '" RESTART IDENTITY CASCADE');
+      } catch(e) { /* skip tables with issues */ }
+    }
     res.json({ ok: true, message: 'All data cleared' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
