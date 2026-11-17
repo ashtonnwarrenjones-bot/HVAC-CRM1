@@ -100,6 +100,27 @@ if (process.env.NODE_ENV === 'production') {
 // ── TEMP admin wipe (token-protected) ─────────────────────────────────────// ── END TEMP ───────────────────────────────────────────────────────────────
 
 const { initDb } = require('./database');
+const db = require('./database');
+app.delete('/api/admin/wipe-all-data', async (req, res) => {
+  if (req.headers['x-admin-token'] !== 'wipe-mahalo-2024') {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  try {
+    await db.query(`
+      TRUNCATE TABLE
+        time_entries, crew_members, invoice_items, invoices,
+        estimate_items, estimates, job_photos, job_tasks, jobs,
+        proposal_line_items, proposals, deal_contacts, deals,
+        service_requests, memberships, attachments, pricebook_items,
+        equipment, vendors, notifications, properties, contacts,
+        companies
+      RESTART IDENTITY CASCADE
+    `);
+    res.json({ ok: true, message: 'All data cleared' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
 initDb()
   .then(() => {
     app.listen(PORT, () => {
