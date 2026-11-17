@@ -596,7 +596,6 @@ function PrintReportsTab({ form, items, contacts, companies, properties }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default 
 function CreateJobForm({ users, loading, onClose, onSubmit }) {
   const SERVICE_TYPES = ['one_time','landscape_route','snow_route','maintenance','installation','inspection','emergency'];
   const [form, setForm] = React.useState({ service_type:'one_time', assigned_user_id:'', scheduled_date:'', scheduled_time:'', notes:'' });
@@ -642,7 +641,7 @@ function CreateJobForm({ users, loading, onClose, onSubmit }) {
   );
 }
 
-function Estimates() {
+export default function Estimates() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isList = !id;
