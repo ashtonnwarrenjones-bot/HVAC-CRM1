@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 const API = '/api';
 const DIVISIONS = ['Landscape', 'Snow', 'Pavement', 'Facilities', 'Irrigation', 'Lighting', 'Hardscape', 'Other'];
-const STATUSES = ['draft', 'sent', 'approved', 'rejected', 'converted', 'in_progress'];
+const STATUSES = ['draft', 'sent', 'approved', 'won', 'rejected', 'converted', 'in_progress'];
 const COST_CODES = ['Landscape', 'Snow', 'Pavement', 'Facilities', 'Irrigation', 'Lighting', 'Hardscape', 'Labor', 'Materials', 'Subcontract', 'Equipment', 'Other'];
 const UNITS = ['each', 'hr', 'sqft', 'sqyd', 'lf', 'lb', 'ton', 'gal', 'day', 'mo', 'units'];
 const RELATIONS = ['None', 'Renewal', 'Enhancement', 'Change Order', 'Rebid', 'New Client', 'Other'];
@@ -596,7 +596,53 @@ function PrintReportsTab({ form, items, contacts, companies, properties }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function Estimates() {
+export default 
+function CreateJobForm({ users, loading, onClose, onSubmit }) {
+  const SERVICE_TYPES = ['one_time','landscape_route','snow_route','maintenance','installation','inspection','emergency'];
+  const [form, setForm] = React.useState({ service_type:'one_time', assigned_user_id:'', scheduled_date:'', scheduled_time:'', notes:'' });
+  const fld = k => e => setForm(p => ({...p, [k]: e.target.value}));
+  const labelStyle = { fontSize:12, color:'#94a3b8', display:'block', marginBottom:4 };
+  const inputStyle = { width:'100%', padding:'7px 10px', background:'#334155', border:'1px solid #475569', borderRadius:4, color:'#e2e8f0', fontSize:13, boxSizing:'border-box' };
+  return (
+    <div>
+      <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        <div>
+          <label style={labelStyle}>Service Type</label>
+          <select value={form.service_type} onChange={fld('service_type')} style={inputStyle}>
+            {SERVICE_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Assign To (optional)</label>
+          <select value={form.assigned_user_id} onChange={fld('assigned_user_id')} style={inputStyle}>
+            <option value=''>— Unassigned —</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Scheduled Date (optional — leave blank to add to unscheduled queue)</label>
+          <input type='date' value={form.scheduled_date} onChange={fld('scheduled_date')} style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Scheduled Time (optional)</label>
+          <input type='time' value={form.scheduled_time} onChange={fld('scheduled_time')} style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Dispatch Notes (optional)</label>
+          <textarea value={form.notes} onChange={fld('notes')} rows={3} style={{...inputStyle, resize:'vertical'}} />
+        </div>
+      </div>
+      <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:20 }}>
+        <button onClick={onClose} disabled={loading} style={{ background:'#334155', border:'none', borderRadius:4, color:'#e2e8f0', padding:'8px 16px', cursor:'pointer', fontSize:13 }}>Cancel</button>
+        <button onClick={() => onSubmit(form)} disabled={loading} style={{ background:'#0f766e', border:'none', borderRadius:4, color:'#fff', padding:'8px 16px', cursor:loading?'not-allowed':'pointer', fontSize:13, fontWeight:600, opacity:loading?0.7:1 }}>
+          {loading ? 'Creating…' : '✓ Create Job'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Estimates() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isList = !id;
@@ -623,6 +669,10 @@ export default function Estimates() {
   const [properties, setProperties] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [estimates, setEstimates] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [showCreateJob, setShowCreateJob] = useState(false);
+  const [createJobLoading, setCreateJobLoading] = useState(false);
+  const [createJobError, setCreateJobError] = useState('');
 
   useEffect(() => {
     if (isList) {
@@ -647,6 +697,12 @@ export default function Estimates() {
       fetch(`${API}/properties?company_id=${form.company_id}`).then(r=>r.json()).then(d=>setProperties(Array.isArray(d)?d:[])).catch(()=>{});
     }
   }, [form.company_id]);
+
+  useEffect(() => {
+    if (!isList) {
+      fetch(`${API}/users`).then(r=>r.json()).then(d=>setUsers(Array.isArray(d)?d:[])).catch(()=>{});
+    }
+  }, [isList]);
 
   const workAreas = [...new Set(items.map(i => i.category||''))].filter(Boolean);
   const getAreaItems = aName => items.filter(i => (i.category||'') === aName);
@@ -700,6 +756,22 @@ export default function Estimates() {
     setSaving(false);
   }
 
+  async function handleCreateJob(formData) {
+    setCreateJobLoading(true); setCreateJobError('');
+    try {
+      const r = await fetch(`${API}/estimates/${id}/convert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed to create job');
+      setShowCreateJob(false);
+      navigate(`/schedule?job=${data.job?.id || ''}`);
+    } catch(e) { setCreateJobError(e.message); }
+    setCreateJobLoading(false);
+  }
+
   async function handleDelete() {
     if (!isExisting) return;
     if (!window.confirm('Delete this estimate? This cannot be undone.')) return;
@@ -743,8 +815,8 @@ export default function Estimates() {
                   <td style={{ padding:'10px 14px' }}><span style={{ color:'#0f766e', fontWeight:600, fontSize:13 }}>{e.estimate_number}</span></td>
                   <td style={{ padding:'10px 14px' }}>
                     <span style={{
-                      background: e.status==='approved'?'#dcfce7':e.status==='sent'?'#dbeafe':e.status==='rejected'?'#fee2e2':'#f1f5f9',
-                      color: e.status==='approved'?'#166534':e.status==='sent'?'#1d4ed8':e.status==='rejected'?'#991b1b':'#64748b',
+                      background: e.status==='approved'?'#dcfce7':e.status==='won'?'#fef9c3':e.status==='sent'?'#dbeafe':e.status==='rejected'?'#fee2e2':'#f1f5f9',
+                      color: e.status==='approved'?'#166534':e.status==='won'?'#854d0e':e.status==='sent'?'#1d4ed8':e.status==='rejected'?'#991b1b':'#64748b',
                       borderRadius:4, padding:'2px 10px', fontSize:12, fontWeight:600, textTransform:'capitalize'
                     }}>{e.status}</span>
                   </td>
@@ -1095,6 +1167,22 @@ export default function Estimates() {
       />
       {drawerOpen && <div onClick={() => setDrawerOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.25)', zIndex:199 }} />}
 
+      {/* Create Job Modal */}
+      {showCreateJob && isExisting && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ background:'#1e293b', borderRadius:8, padding:28, width:440, maxWidth:'90vw', color:'#e2e8f0' }}>
+            <h3 style={{ margin:'0 0 18px', fontSize:16, color:'#f8fafc' }}>Create Job from Estimate</h3>
+            {createJobError && <div style={{ background:'#fee2e2', color:'#991b1b', padding:'8px 12px', borderRadius:4, marginBottom:12, fontSize:13 }}>{createJobError}</div>}
+            <CreateJobForm
+              users={users}
+              loading={createJobLoading}
+              onClose={() => { setShowCreateJob(false); setCreateJobError(''); }}
+              onSubmit={handleCreateJob}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Sticky bottom action bar — matches LMN layout */}
       <div style={{ background:'#1e293b', borderTop:'2px solid #0f766e', padding:'10px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', position:'fixed', bottom:0, left:0, right:0, zIndex:50 }}>
         <div style={{ display:'flex', gap:6 }}>
@@ -1107,7 +1195,7 @@ export default function Estimates() {
         </div>
         <div style={{ display:'flex', gap:6, alignItems:'center' }}>
           {error && <span style={{ color:'#fca5a5', fontSize:12 }}>{error}</span>}
-          <button style={{ background:'#1d4ed8', border:'none', borderRadius:4, color:'#fff', padding:'7px 13px', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+          <button onClick={() => { setShowCreateJob(true); setCreateJobError(''); }} style={{ background:'#1d4ed8', border:'none', borderRadius:4, color:'#fff', padding:'7px 13px', cursor:'pointer', fontSize:12, fontWeight:600 }}>
             ▷ Create Job
           </button>
           <button style={{ background:'#0369a1', border:'none', borderRadius:4, color:'#fff', padding:'7px 13px', cursor:'pointer', fontSize:12, fontWeight:600 }}>
