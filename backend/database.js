@@ -1042,8 +1042,8 @@ async function initDb() {
     try { await pool.query(sql); } catch (_) {}
   }
 
-  // Seed demo data if the DB is empty
-  await seedDemoData();
+  // Seed demo data disabled — data is managed manually
+  // await seedDemoData();
 
   console.log('✅ PostgreSQL database ready.');
 }
