@@ -100,27 +100,6 @@ if (process.env.NODE_ENV === 'production') {
 // ── TEMP admin wipe (token-protected) ─────────────────────────────────────// ── END TEMP ───────────────────────────────────────────────────────────────
 
 const { initDb } = require('./database');
-const db = require('./database');
-app.delete('/api/admin/wipe-all-data', async (req, res) => {
-  if (req.headers['x-admin-token'] !== 'wipe-mahalo-2024') {
-    return res.status(403).json({ error: 'forbidden' });
-  }
-  try {
-    // Get all user-data tables (skip users/sessions)
-    const { rows } = await db.pool.query(`
-      SELECT tablename FROM pg_tables
-      WHERE schemaname = 'public' AND tablename NOT IN ('users','sessions','schema_migrations')
-    `);
-    for (const { tablename } of rows) {
-      try {
-        await db.pool.query('TRUNCATE TABLE "' + tablename + '" RESTART IDENTITY CASCADE');
-      } catch(e) { /* skip tables with issues */ }
-    }
-    res.json({ ok: true, message: 'All data cleared' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-
 initDb()
   .then(() => {
     app.listen(PORT, () => {
