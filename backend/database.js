@@ -1034,6 +1034,8 @@ async function initDb() {
     "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL",
     "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qb_id TEXT",
     "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qb_synced_at TIMESTAMP",
+    "CREATE TABLE IF NOT EXISTS integration_configs (id SERIAL PRIMARY KEY, type TEXT UNIQUE NOT NULL, config JSONB DEFAULT '{}', updated_at TIMESTAMPTZ DEFAULT NOW())",
+    "CREATE TABLE IF NOT EXISTS integration_logs (id SERIAL PRIMARY KEY, type TEXT NOT NULL, action TEXT, status TEXT, details TEXT, created_at TIMESTAMPTZ DEFAULT NOW())",
 
 ];
 
