@@ -14,8 +14,10 @@ const PROPERTY_OPTIONS = [
 ];
 const CONTRACT_COLORS = {
   maintenance_contract: 'badge-green',
+  client: 'badge-green',
   on_call: 'badge-blue',
-  prospect: 'badge-yellow',
+  prospect: 'badge-orange',
+  lead: 'badge-orange',
   inactive: 'badge-gray',
 };
 
