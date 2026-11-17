@@ -598,5 +598,85 @@ router.post('/lmn/leads', async (req, res) => {
   res.json(summary);
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/import/lmn/fetch-and-import
+// Body: { lmn_token: "..." }  — CRM server fetches from LMN, then imports
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/lmn/fetch-and-import', async (req, res) => {
+  const { lmn_token } = req.body;
+  if (!lmn_token) return res.status(400).json({ error: 'lmn_token required' });
+
+  // 1. Fetch all leads from LMN
+  let leads;
+  try {
+    const lmnRes = await fetch(
+      'https://app-lmn-internal-prod-internal.golmn.com/api/v1/leads-data?pageSize=1000&page=1',
+      { headers: { Authorization: 'Bearer ' + lmn_token } }
+    );
+    if (!lmnRes.ok) return res.status(502).json({ error: 'LMN fetch failed: ' + lmnRes.status });
+    const lmnData = await lmnRes.json();
+    leads = lmnData.leads || [];
+  } catch (e) {
+    return res.status(502).json({ error: 'LMN fetch error: ' + e.message });
+  }
+
+  // 2. Import (same logic as /lmn/leads)
+  const summary = { total: leads.length, companies_created: 0, companies_skipped: 0, contacts_created: 0, contacts_skipped: 0, errors: [] };
+  const typeMap = { 0: 'prospect', 1: 'client', 2: 'prospect', 3: 'prospect' };
+
+  for (const lead of leads) {
+    if (lead.IsArchived) continue;
+    const name = (lead.LeadName || '').trim();
+    if (!name) continue;
+
+    let company_id = null;
+    try {
+      const existing = await db.prepare('SELECT id FROM companies WHERE LOWER(name) = LOWER(?)').get(name);
+      if (existing) {
+        company_id = existing.id;
+        summary.companies_skipped++;
+      } else {
+        const result = await db.prepare(`
+          INSERT INTO companies (name, address, city, state, zip, phone, website, property_type, contract_type, notes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(name, lead.Address1||null, lead.City||null, lead.Province||null, lead.PostalCode||null,
+               lead.Phone1||null, null, 'commercial', typeMap[lead.LeadType]||'prospect', lead.Notes||null);
+        company_id = result.lastInsertRowid || result.rows?.[0]?.id;
+        summary.companies_created++;
+      }
+    } catch (e) {
+      summary.errors.push(`Company "${name}": ${e.message}`);
+      continue;
+    }
+
+    const firstName = (lead.Firstname || '').trim();
+    const lastName  = (lead.Lastname  || '').trim();
+    if (!firstName && !lastName) continue;
+    const fName = firstName || 'Unknown';
+    const lName = lastName  || 'Unknown';
+
+    try {
+      const existingContact = await db.prepare(
+        'SELECT id FROM contacts WHERE company_id = ? AND LOWER(first_name) = LOWER(?) AND LOWER(last_name) = LOWER(?)'
+      ).get(company_id, fName, lName);
+      if (existingContact) {
+        summary.contacts_skipped++;
+      } else {
+        await db.prepare(`
+          INSERT INTO contacts (company_id, first_name, last_name, email, phone, mobile, title, is_primary, notes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        `).run(company_id, fName, lName, lead.Email1||null, lead.Phone1||null, lead.Phone2||null, lead.Position||null, null);
+        summary.contacts_created++;
+      }
+    } catch (e) {
+      summary.errors.push(`Contact "${fName} ${lName}": ${e.message}`);
+    }
+  }
+
+  res.json(summary);
+});
+
 module.exports = router;
+
 
