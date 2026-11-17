@@ -509,4 +509,94 @@ router.post('/lmn/pricebook', async (req, res) => {
   res.json(summary);
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/import/lmn/leads  (LMN Contacts/Leads → companies + contacts)
+// Body: { leads: [ ...LMN leads array... ] }
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/lmn/leads', async (req, res) => {
+  const { leads = [] } = req.body;
+  const summary = { companies_created: 0, companies_skipped: 0, contacts_created: 0, contacts_skipped: 0, errors: [] };
+
+  // LeadType mapping: 0=Lead/prospect, 1=Client, 2=prospect, 3=prospect
+  const typeMap = { 0: 'prospect', 1: 'client', 2: 'prospect', 3: 'prospect' };
+
+  for (const lead of leads) {
+    if (lead.IsArchived) continue;
+
+    const name = (lead.LeadName || '').trim();
+    if (!name) continue;
+
+    // ── Upsert company ──
+    let company_id = null;
+    try {
+      const existing = await db.prepare('SELECT id FROM companies WHERE LOWER(name) = LOWER(?)').get(name);
+      if (existing) {
+        company_id = existing.id;
+        summary.companies_skipped++;
+      } else {
+        const result = await db.prepare(`
+          INSERT INTO companies (name, address, city, state, zip, phone, website,
+            property_type, contract_type, notes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          name,
+          lead.Address1 || null,
+          lead.City     || null,
+          lead.Province || null,
+          lead.PostalCode || null,
+          lead.Phone1   || null,
+          null,
+          'commercial',
+          typeMap[lead.LeadType] || 'prospect',
+          lead.Notes    || null,
+        );
+        company_id = result.lastInsertRowid || result.rows?.[0]?.id;
+        summary.companies_created++;
+      }
+    } catch (e) {
+      summary.errors.push(`Company "${name}": ${e.message}`);
+      continue;
+    }
+
+    // ── Create contact (skip if no name) ──
+    const firstName = (lead.Firstname || '').trim();
+    const lastName  = (lead.Lastname  || '').trim();
+    if (!firstName && !lastName) continue;
+
+    const fName = firstName || 'Unknown';
+    const lName = lastName  || 'Unknown';
+
+    try {
+      const existingContact = await db.prepare(
+        'SELECT id FROM contacts WHERE company_id = ? AND LOWER(first_name) = LOWER(?) AND LOWER(last_name) = LOWER(?)'
+      ).get(company_id, fName, lName);
+
+      if (existingContact) {
+        summary.contacts_skipped++;
+      } else {
+        await db.prepare(`
+          INSERT INTO contacts (company_id, first_name, last_name, email, phone, mobile, title, is_primary, notes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        `).run(
+          company_id,
+          fName,
+          lName,
+          lead.Email1  || null,
+          lead.Phone1  || null,
+          lead.Phone2  || null,
+          lead.Position || null,
+          null,
+        );
+        summary.contacts_created++;
+      }
+    } catch (e) {
+      summary.errors.push(`Contact "${fName} ${lName}" for "${name}": ${e.message}`);
+    }
+  }
+
+  res.json(summary);
+});
+
 module.exports = router;
+
