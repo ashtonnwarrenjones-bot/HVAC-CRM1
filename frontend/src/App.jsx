@@ -352,27 +352,7 @@ function AppLayout() {
       {/* ── Sidebar ── */}
       <nav className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-logo">
-          <Logo size={36} variant="white" subtitle="Field Service CRM" />
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4, paddingLeft: 2, fontStyle: 'italic', lineHeight: 1.4 }}>
-            Linking you to your customers
-          </div>
-        </div>
-
-        {/* Search button in sidebar */}
-        <div style={{ padding: '8px 8px 0' }}>
-          <button
-            onClick={() => { setShowSearch(true); closeMenu(); }}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,.15)',
-              background: 'rgba(255,255,255,.07)', color: 'rgba(255,255,255,.6)',
-              fontSize: 13, cursor: 'pointer', textAlign: 'left'
-            }}
-          >
-            <Search size={14} />
-            <span style={{ flex: 1 }}>Quick search…</span>
-            <kbd style={{ fontSize: 10, background: 'rgba(255,255,255,.1)', borderRadius: 3, padding: '1px 5px', color: 'rgba(255,255,255,.5)' }}>⌘K</kbd>
-          </button>
+          <Logo size={28} variant="white" subtitle={null} />
         </div>
 
         <div className="sidebar-nav">
@@ -381,11 +361,11 @@ function AppLayout() {
               key={to}
               to={to}
               end={exact}
+              title={label}
               className={({ isActive }) => isActive ? 'active' : ''}
               onClick={closeMenu}
             >
-              <span className="nav-icon"><Icon size={17} /></span>
-              {label}
+              <span className="nav-icon"><Icon size={18} /></span>
             </NavLink>
           ))}
         </div>
@@ -397,76 +377,43 @@ function AppLayout() {
           </div>
         )}
 
-        <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
-          <a
-            href="/portal"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={closeMenu}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 6, color: 'rgba(255,255,255,.7)', textDecoration: 'none', fontSize: '13.5px', fontWeight: 500 }}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,.08)' }}>
+          <a href="/portal" target="_blank" rel="noopener noreferrer" title="Customer Portal" onClick={closeMenu}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '11px 0', color: 'rgba(255,255,255,.42)', textDecoration: 'none', transition: 'color .15s' }}
+            onMouseEnter={e => e.currentTarget.style.color='rgba(255,255,255,.8)'}
+            onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,.42)'}
           >
-            <span className="nav-icon"><Globe size={17} /></span>
-            Customer Portal
+            <Globe size={18} />
           </a>
-          <NavLink
-            to="/settings"
+          <NavLink to="/settings" title="Settings" onClick={closeMenu}
             className={({ isActive }) => isActive ? 'active' : ''}
-            onClick={closeMenu}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 6, color: 'rgba(255,255,255,.7)', textDecoration: 'none', fontSize: '13.5px', fontWeight: 500 }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '11px 0', color: 'rgba(255,255,255,.42)', textDecoration: 'none', borderRadius: 7, margin: '0 6px 4px' }}
           >
-            <span className="nav-icon"><SettingsIcon size={17} /></span>
-            Settings
+            <SettingsIcon size={18} />
           </NavLink>
         </div>
 
-        <div style={{ padding: '8px 12px 4px', borderTop: '1px solid rgba(255,255,255,.08)', position: 'relative' }} ref={notifsRef}>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 6, paddingLeft: 4 }}>
-            Signed in as <strong style={{ color: 'rgba(255,255,255,.7)' }}>{username}</strong>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {/* Dark mode toggle */}
-            <button
-              onClick={() => setDark(d => !d)}
-              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={{
-                flex: '0 0 auto', padding: '7px 10px', background: 'rgba(255,255,255,.08)',
-                border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, color: 'rgba(255,255,255,.7)',
-                cursor: 'pointer', display: 'flex', alignItems: 'center'
-              }}
-            >
-              {dark ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
-            <button
-              onClick={() => { setShowNotifs(o => !o); setUnreadCount(0); }}
-              style={{
-                flex: '0 0 auto', padding: '7px 10px', background: showNotifs ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.08)',
-                border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, color: 'rgba(255,255,255,.8)',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, position: 'relative'
-              }}
-            >
-              <Bell size={16} />
+        <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingBottom: 6, position: 'relative' }} ref={notifsRef}>
+          <button onClick={() => setDark(d => !d)} title={dark ? 'Light mode' : 'Dark mode'}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 0', background: 'none', border: 'none', color: 'rgba(255,255,255,.42)', cursor: 'pointer' }}>
+            {dark ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => { setShowNotifs(o => !o); setUnreadCount(0); }} title="Notifications"
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 0', background: 'none', border: 'none', color: showNotifs ? '#fff' : 'rgba(255,255,255,.42)', cursor: 'pointer', position: 'relative' }}>
+              <Bell size={17} />
               {unreadCount > 0 && (
-                <span style={{ background: '#ef4444', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 5px', lineHeight: 1.4 }}>
+                <span style={{ position: 'absolute', top: 5, right: 8, background: '#ef4444', color: '#fff', borderRadius: 10, fontSize: 9, fontWeight: 700, padding: '1px 4px', lineHeight: 1.4 }}>
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
-            <button
-              onClick={() => { logout(); closeMenu(); }}
-              style={{
-                flex: 1, padding: '7px 10px', background: 'rgba(255,255,255,.08)',
-                border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, color: 'rgba(255,255,255,.6)',
-                fontSize: 12, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8
-              }}
-            >
-              <LogOut size={14} /> Sign Out
-            </button>
+            {showNotifs && <NotificationsPanel onClose={() => setShowNotifs(false)} />}
           </div>
-          {showNotifs && <NotificationsPanel onClose={() => setShowNotifs(false)} />}
-        </div>
-
-        <div style={{ padding: '8px 16px 12px', fontSize: 11, color: 'rgba(255,255,255,.3)' }}>
-          v1.0 • Mahalo Pro
+          <button onClick={() => { logout(); closeMenu(); }} title={`Sign out (${username})`}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 0', background: 'none', border: 'none', color: 'rgba(255,255,255,.42)', cursor: 'pointer' }}>
+            <LogOut size={17} />
+          </button>
         </div>
       </nav>
 
