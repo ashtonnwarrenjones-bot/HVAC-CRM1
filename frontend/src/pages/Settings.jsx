@@ -86,7 +86,7 @@ export default function Settings() {
   }, []);
 
   const loadUsers = () => {
-    axios.get('/api/users').then(r => setUsers(r.data)).catch(() => {});
+    axios.get('/api/users').then(r => setUsers(Array.isArray(r.data) ? r.data : [])).catch(() => {});
   };
 
   // Load CE config when switching to integrations tab
@@ -114,7 +114,7 @@ export default function Settings() {
   const loadCeLog = () => {
     setCeLogLoading(true);
     axios.get('/api/integrations/log?key=computerease&limit=30')
-      .then(r => setCeLog(r.data || []))
+      .then(r => setCeLog(Array.isArray(r.data) ? r.data : []))
       .catch(() => {})
       .finally(() => setCeLogLoading(false));
   };
