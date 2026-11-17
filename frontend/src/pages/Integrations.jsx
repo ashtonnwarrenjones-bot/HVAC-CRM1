@@ -17,7 +17,7 @@ export default function Integrations() {
   const [tagDealId, setTagDealId] = useState('');
   const [toast, setToast] = useState(null);
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('crm_token');
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
   function showToast(msg, type = 'success') {
@@ -73,7 +73,7 @@ export default function Integrations() {
   }
 
   async function loadDeals() {
-    try { const r = await fetch(`${API}/api/deals`, { headers }); setDeals(await r.json() || []); } catch { }
+    try { const r = await fetch(`${API}/api/deals`, { headers }); const d = await r.json(); setDeals(Array.isArray(d) ? d : []); } catch { }
   }
 
   async function tagTx() {
