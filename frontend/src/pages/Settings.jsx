@@ -70,13 +70,11 @@ export default function Settings() {
   };
 
   // ComputerEase integration
-  const [ceForm, setCeForm] = useState({ server:'', port:'1433', database:'', username:'', password:'', laborCostCode:'001', materialCostCode:'002', defaultLaborRate:'', enabled: false });
-  const [ceSaving,    setCeSaving]    = useState(false);
-  const [ceTesting,   setCeTesting]   = useState(false);
-  const [ceTestResult,setCeTestResult]= useState(null); // { ok, version, tables, error }
-  const [ceLog,       setCeLog]       = useState([]);
-  const [ceLogLoading,setCeLogLoading]= useState(false);
-  const [ceShowPw,    setCeShowPw]    = useState(false);
+  // Divvy integration
+  const [divvyStatus,  setDivvyStatus]  = useState(null);
+  const [divvyKey,     setDivvyKey]     = useState('');
+  const [divvyLoading, setDivvyLoading] = useState(false);
+  const [divvySaving,  setDivvySaving]  = useState(false);
 
   useEffect(() => {
     axios.get('/api/settings').then(r => {
@@ -89,61 +87,35 @@ export default function Settings() {
     axios.get('/api/users').then(r => setUsers(Array.isArray(r.data) ? r.data : [])).catch(() => {});
   };
 
-  // Load CE config when switching to integrations tab
+  // Load Divvy status when switching to integrations tab
   useEffect(() => {
     if (tab !== 'integrations') return;
-    axios.get('/api/integrations/settings').then(r => {
-      const cfg = r.data?.computerease || {};
-      setCeForm(f => ({
-        ...f,
-        server:           cfg.server           || '',
-        port:             cfg.port             || '1433',
-        database:         cfg.database         || '',
-        username:         cfg.username         || '',
-        password:         cfg.password         || '',
-        laborCostCode:    cfg.laborCostCode    || '001',
-        materialCostCode: cfg.materialCostCode || '002',
-        defaultLaborRate: cfg.defaultLaborRate || '',
-        enabled:          !!cfg.enabled,
-      }));
-    }).catch(() => {});
-    loadCeLog();
+    loadDivvyStatus();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  const loadCeLog = () => {
-    setCeLogLoading(true);
-    axios.get('/api/integrations/log?key=computerease&limit=30')
-      .then(r => setCeLog(Array.isArray(r.data) ? r.data : []))
-      .catch(() => {})
-      .finally(() => setCeLogLoading(false));
+  const loadDivvyStatus = () => {
+    setDivvyLoading(true);
+    axios.get('/api/divvy/status')
+      .then(r => setDivvyStatus(r.data))
+      .catch(() => setDivvyStatus(null))
+      .finally(() => setDivvyLoading(false));
   };
 
-  const saveCeConfig = async () => {
-    setCeSaving(true);
-    setCeTestResult(null);
+  const saveDivvyKey = async () => {
+    if (!divvyKey.trim()) return;
+    setDivvySaving(true);
     try {
-      await axios.post('/api/integrations/computerease/config', ceForm);
-      loadCeLog();
+      const r = await axios.post('/api/divvy/config', { api_key: divvyKey.trim() });
+      if (r.data?.ok) { setDivvyKey(''); loadDivvyStatus(); }
     } catch (e) {
-      alert('Save failed: ' + (e.response?.data?.error || e.message));
-    } finally { setCeSaving(false); }
+      alert('Failed: ' + (e.response?.data?.error || e.message));
+    } finally { setDivvySaving(false); }
   };
 
-  const testCeConnection = async () => {
-    setCeTesting(true);
-    setCeTestResult(null);
-    try {
-      // Save first so backend tests with latest values
-      await axios.post('/api/integrations/computerease/config', ceForm);
-      const r = await axios.post('/api/integrations/computerease/test');
-      setCeTestResult(r.data);
-      loadCeLog();
-    } catch (e) {
-      setCeTestResult({ ok: false, error: e.response?.data?.error || e.message });
-    } finally { setCeTesting(false); }
+  const disconnectDivvy = async () => {
+    try { await axios.post('/api/divvy/config', { api_key: '' }); loadDivvyStatus(); } catch (e) {}
   };
-
   const createUser = async () => {
     if (!newUser.username || !newUser.password) {
       setUserMsg({ ok: false, text: 'Username and password are required.' });
@@ -547,48 +519,36 @@ export default function Settings() {
           <>
             {sectionTitle('Integrations', 'Connect external systems to automate data flow between your CRM and accounting software.')}
 
-            {/* ── ComputerEase ── */}
+            {/* ── Divvy (BILL Spend & Expense) ── */}
             <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:12, marginBottom:20, overflow:'hidden' }}>
               {/* Header */}
               <div style={{ display:'flex', alignItems:'center', gap:14, padding:'18px 22px', borderBottom:'1px solid var(--border)' }}>
-                <div style={{ width:46, height:46, borderRadius:10, background:'#1e3a5f', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  <span style={{ color:'#fff', fontWeight:900, fontSize:15, letterSpacing:'-0.5px' }}>CE</span>
+                <div style={{ width:46, height:46, borderRadius:10, background:'#6366f1', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <span style={{ color:'#fff', fontWeight:900, fontSize:13, letterSpacing:'-0.5px' }}>BILL</span>
                 </div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontWeight:700, fontSize:15, color:'var(--text-primary)' }}>ComputerEase</div>
-                  <div style={{ fontSize:13, color:'var(--text-muted)', marginTop:2 }}>Job cost sync · P.O. auto-detect · Completed job push</div>
+                  <div style={{ fontWeight:700, fontSize:15, color:'var(--text-primary)' }}>Divvy (BILL Spend &amp; Expense)</div>
+                  <div style={{ fontSize:13, color:'var(--text-muted)', marginTop:2 }}>Tag card transactions to deals · track budgets · pull spend data</div>
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  {/* Enable toggle */}
-                  <label style={{ display:'flex', alignItems:'center', gap:7, cursor:'pointer', userSelect:'none' }}>
-                    <div
-                      onClick={() => setCeForm(f => ({ ...f, enabled: !f.enabled }))}
-                      style={{ width:38, height:22, borderRadius:11, background: ceForm.enabled ? '#16a34a' : '#d1d5db', position:'relative', cursor:'pointer', transition:'background 0.2s' }}
-                    >
-                      <div style={{ position:'absolute', top:3, left: ceForm.enabled ? 18 : 3, width:16, height:16, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.2)' }} />
-                    </div>
-                    <span style={{ fontSize:12, fontWeight:600, color: ceForm.enabled ? '#16a34a' : '#6b7280' }}>
-                      {ceForm.enabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </label>
-                  {/* Status badge */}
-                  {ceTestResult && (
-                    <span style={{ fontSize:11, padding:'3px 10px', borderRadius:20, fontWeight:700, background: ceTestResult.ok ? '#dcfce7' : '#fee2e2', color: ceTestResult.ok ? '#166534' : '#991b1b' }}>
-                      {ceTestResult.ok ? '● Connected' : '● Error'}
-                    </span>
-                  )}
+                <div>
+                  {divvyLoading
+                    ? <span style={{ fontSize:12, color:'var(--text-muted)' }}>Checking…</span>
+                    : <span style={{ fontSize:12, fontWeight:700, padding:'4px 12px', borderRadius:20, background: divvyStatus?.connected ? '#dcfce7' : '#f3f4f6', color: divvyStatus?.connected ? '#16a34a' : '#6b7280' }}>
+                        {divvyStatus?.connected ? '● Connected' : '○ Not connected'}
+                      </span>
+                  }
                 </div>
               </div>
 
-              {/* What syncs */}
+              {/* What you get */}
               <div style={{ padding:'14px 22px', background:'#f8fafc', borderBottom:'1px solid var(--border)', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'8px 16px' }}>
                 {[
-                  ['🔢', 'CE Job #', 'Auto-detected when created in CE'],
-                  ['📋', 'P.O. Numbers', 'Pulled from CE → auto-emailed to suppliers'],
-                  ['⏱️', 'Labor Costs', 'Time entries pushed to CE job ledger'],
-                  ['🔩', 'Material Costs', 'Parts used pushed to CE job ledger'],
-                  ['✅', 'Job Completion', 'Marks job in CE when CRM job closes'],
-                  ['📊', 'Sync Log', 'Every operation logged for audit trail'],
+                  ['💳', 'Card Transactions', 'Pull spend data from Divvy automatically'],
+                  ['🏷️', 'Tag to Deals', 'Link any transaction to a CRM deal'],
+                  ['📊', 'Budget Tracking', 'See per-deal spend vs budget at a glance'],
+                  ['⚠️', 'Over-Budget Alerts', 'Get warned when a deal exceeds its budget'],
+                  ['🔄', 'Auto-Refresh', 'Transactions sync whenever you visit'],
+                  ['🗂️', 'Full History', 'View all transactions on the Integrations page'],
                 ].map(([icon, title, desc]) => (
                   <div key={title} style={{ display:'flex', gap:8, alignItems:'flex-start' }}>
                     <span style={{ fontSize:16 }}>{icon}</span>
@@ -600,179 +560,39 @@ export default function Settings() {
                 ))}
               </div>
 
-              {/* Connection form */}
+              {/* Connection */}
               <div style={{ padding:'20px 22px' }}>
-                <div style={{ fontSize:13, fontWeight:700, color:'var(--text-secondary)', marginBottom:14 }}>SQL Server Connection</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 120px', gap:10, marginBottom:10 }}>
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>Server / IP Address</label>
-                    <input
-                      value={ceForm.server}
-                      onChange={e => setCeForm(f => ({ ...f, server: e.target.value }))}
-                      placeholder="192.168.1.50 or OFFICE-SERVER"
-                      style={{ width:'100%', padding:'8px 11px', borderRadius:7, border:'1px solid var(--border)', fontSize:13, background:'var(--bg-page)', color:'var(--text-primary)', boxSizing:'border-box' }}
-                    />
+                {divvyStatus?.connected ? (
+                  <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+                    <div style={{ flex:1, fontSize:14, color:'var(--text-primary)' }}>
+                      Divvy API key saved. View transactions and budgets on the <strong>Integrations</strong> page.
+                    </div>
+                    <button onClick={disconnectDivvy} style={{ background:'#fff', color:'#dc2626', border:'1px solid #fca5a5', borderRadius:7, padding:'8px 16px', cursor:'pointer', fontWeight:600, fontSize:13, flexShrink:0 }}>
+                      Disconnect
+                    </button>
                   </div>
+                ) : (
                   <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>Port</label>
-                    <input
-                      value={ceForm.port}
-                      onChange={e => setCeForm(f => ({ ...f, port: e.target.value }))}
-                      placeholder="1433"
-                      style={{ width:'100%', padding:'8px 11px', borderRadius:7, border:'1px solid var(--border)', fontSize:13, background:'var(--bg-page)', color:'var(--text-primary)', boxSizing:'border-box' }}
-                    />
-                  </div>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:10 }}>
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>Database Name</label>
-                    <input
-                      value={ceForm.database}
-                      onChange={e => setCeForm(f => ({ ...f, database: e.target.value }))}
-                      placeholder="CEASDB"
-                      style={{ width:'100%', padding:'8px 11px', borderRadius:7, border:'1px solid var(--border)', fontSize:13, background:'var(--bg-page)', color:'var(--text-primary)', boxSizing:'border-box' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>SQL Username</label>
-                    <input
-                      value={ceForm.username}
-                      onChange={e => setCeForm(f => ({ ...f, username: e.target.value }))}
-                      placeholder="sa"
-                      style={{ width:'100%', padding:'8px 11px', borderRadius:7, border:'1px solid var(--border)', fontSize:13, background:'var(--bg-page)', color:'var(--text-primary)', boxSizing:'border-box' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>Password</label>
-                    <div style={{ position:'relative' }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--text-secondary)', marginBottom:10 }}>Connect with API Key</div>
+                    <div style={{ display:'flex', gap:10 }}>
                       <input
-                        type={ceShowPw ? 'text' : 'password'}
-                        value={ceForm.password}
-                        onChange={e => setCeForm(f => ({ ...f, password: e.target.value }))}
-                        placeholder="SQL password"
-                        style={{ width:'100%', padding:'8px 36px 8px 11px', borderRadius:7, border:'1px solid var(--border)', fontSize:13, background:'var(--bg-page)', color:'var(--text-primary)', boxSizing:'border-box' }}
+                        type="password"
+                        placeholder="Paste your Divvy API key…"
+                        value={divvyKey}
+                        onChange={e => setDivvyKey(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && saveDivvyKey()}
+                        style={{ flex:1, padding:'9px 12px', borderRadius:7, border:'1px solid var(--border)', fontSize:13, background:'var(--bg-page)', color:'var(--text-primary)' }}
                       />
-                      <button onClick={() => setCeShowPw(p=>!p)} style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', fontSize:11, color:'#6b7280' }}>
-                        {ceShowPw ? 'Hide' : 'Show'}
+                      <button onClick={saveDivvyKey} disabled={divvySaving || !divvyKey.trim()} style={{ background:'#6366f1', color:'#fff', border:'none', borderRadius:7, padding:'9px 20px', cursor:'pointer', fontWeight:700, fontSize:13, flexShrink:0, opacity: divvySaving ? 0.7 : 1 }}>
+                        {divvySaving ? 'Saving…' : 'Connect'}
                       </button>
                     </div>
-                  </div>
-                </div>
-
-                {/* Cost codes */}
-                <div style={{ marginBottom:10 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'var(--text-secondary)', marginBottom:10, paddingTop:6, borderTop:'1px solid var(--border)' }}>Cost Code Mapping</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-                    <div>
-                      <label style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>Labor Cost Code</label>
-                      <input value={ceForm.laborCostCode} onChange={e => setCeForm(f => ({ ...f, laborCostCode: e.target.value }))} placeholder="001"
-                        style={{ width:'100%', padding:'8px 11px', borderRadius:7, border:'1px solid var(--border)', fontSize:13, background:'var(--bg-page)', color:'var(--text-primary)', boxSizing:'border-box' }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>Material Cost Code</label>
-                      <input value={ceForm.materialCostCode} onChange={e => setCeForm(f => ({ ...f, materialCostCode: e.target.value }))} placeholder="002"
-                        style={{ width:'100%', padding:'8px 11px', borderRadius:7, border:'1px solid var(--border)', fontSize:13, background:'var(--bg-page)', color:'var(--text-primary)', boxSizing:'border-box' }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>Default Labor Rate ($/hr)</label>
-                      <input type="number" value={ceForm.defaultLaborRate} onChange={e => setCeForm(f => ({ ...f, defaultLaborRate: e.target.value }))} placeholder="85"
-                        style={{ width:'100%', padding:'8px 11px', borderRadius:7, border:'1px solid var(--border)', fontSize:13, background:'var(--bg-page)', color:'var(--text-primary)', boxSizing:'border-box' }} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Test result */}
-                {ceTestResult && (
-                  <div style={{ padding:'12px 14px', borderRadius:8, background: ceTestResult.ok ? '#f0fdf4' : '#fef2f2', border:`1px solid ${ceTestResult.ok ? '#86efac' : '#fca5a5'}`, marginBottom:12 }}>
-                    {ceTestResult.ok ? (
-                      <>
-                        <div style={{ fontSize:13, fontWeight:700, color:'#166534', marginBottom:4 }}>✓ Connected successfully</div>
-                        <div style={{ fontSize:12, color:'#15803d' }}>{ceTestResult.version}</div>
-                        {ceTestResult.tables && (
-                          <div style={{ fontSize:11, color:'#166534', marginTop:6 }}>
-                            {ceTestResult.tables.length} tables found — schema ready to map.
-                            <span style={{ marginLeft:8, opacity:0.7 }}>{ceTestResult.tables.slice(0,8).join(', ')}{ceTestResult.tables.length > 8 ? '…' : ''}</span>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ fontSize:13, fontWeight:700, color:'#991b1b', marginBottom:4 }}>Connection failed</div>
-                        <div style={{ fontSize:12, color:'#dc2626', fontFamily:'monospace' }}>{ceTestResult.error}</div>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div style={{ display:'flex', gap:10 }}>
-                  <button
-                    onClick={testCeConnection}
-                    disabled={ceTesting || !ceForm.server}
-                    style={{ padding:'9px 18px', borderRadius:8, border:'1px solid #bfdbfe', background:'#eff6ff', color:'#1d4ed8', fontSize:13, fontWeight:700, cursor: ceTesting||!ceForm.server ? 'not-allowed' : 'pointer', opacity: ceTesting||!ceForm.server ? 0.6 : 1 }}
-                  >
-                    {ceTesting ? 'Testing…' : '⚡ Test Connection'}
-                  </button>
-                  <button
-                    onClick={saveCeConfig}
-                    disabled={ceSaving}
-                    style={{ padding:'9px 20px', borderRadius:8, border:'none', background:'#1e3a5f', color:'#fff', fontSize:13, fontWeight:700, cursor: ceSaving ? 'not-allowed' : 'pointer', opacity: ceSaving ? 0.7 : 1 }}
-                  >
-                    {ceSaving ? 'Saving…' : 'Save Settings'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Sync Log */}
-              <div style={{ borderTop:'1px solid var(--border)', padding:'16px 22px' }}>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'var(--text-secondary)' }}>Sync Log</div>
-                  <button onClick={loadCeLog} style={{ fontSize:11, color:'#2563eb', background:'none', border:'none', cursor:'pointer' }}>Refresh</button>
-                </div>
-                {ceLogLoading ? (
-                  <div style={{ fontSize:12, color:'#9ca3af', padding:'8px 0' }}>Loading…</div>
-                ) : ceLog.length === 0 ? (
-                  <div style={{ fontSize:12, color:'#9ca3af', padding:'8px 0' }}>No activity yet — save your settings and test the connection to get started.</div>
-                ) : (
-                  <div style={{ maxHeight:200, overflowY:'auto', fontFamily:'monospace', fontSize:11 }}>
-                    {ceLog.map(entry => (
-                      <div key={entry.id} style={{ display:'flex', gap:10, padding:'5px 0', borderBottom:'1px solid var(--border)', alignItems:'flex-start' }}>
-                        <span style={{ color: entry.status==='success'?'#16a34a':entry.status==='error'?'#dc2626':'#6b7280', fontWeight:700, flexShrink:0 }}>
-                          {entry.status==='success'?'✓':entry.status==='error'?'✗':'·'}
-                        </span>
-                        <span style={{ color:'#9ca3af', flexShrink:0 }}>{new Date(entry.created_at).toLocaleTimeString()}</span>
-                        <span style={{ color:'var(--text-muted)', flexShrink:0 }}>[{entry.operation}]</span>
-                        <span style={{ color:'var(--text-primary)' }}>{entry.message}</span>
-                      </div>
-                    ))}
+                    <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:8 }}>Find your API key in Divvy → Settings → Integrations → API Access.</div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* QuickBooks */}
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 10, background: '#2CA01C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ color: '#fff', fontWeight: 900, fontSize: 18, fontFamily: 'serif' }}>QB</span>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>QuickBooks Online</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>Sync invoices, customers, and payments</div>
-                </div>
-                <div style={{ marginLeft: 'auto' }}>
-                  <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 700, background: '#fef3c7', color: '#92400e' }}>Coming Soon</span>
-                </div>
-              </div>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 14px', lineHeight: 1.6 }}>
-                Sync invoices, customers, and payments with QuickBooks Online. On the roadmap — connection setup will appear here when available.
-              </p>
-              <button disabled style={{ padding:'9px 18px', borderRadius:8, border:'none', background:'#e5e7eb', color:'#9ca3af', fontWeight:700, fontSize:13, cursor:'not-allowed' }}>
-                Coming Soon
-              </button>
-            </div>
-
-            {/* Placeholder */}
             <div style={{ background: 'var(--bg-card)', border: '1px dashed var(--border)', borderRadius: 12, padding: '16px 22px', opacity: 0.6 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3 }}>More integrations coming</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Stripe payments, Google Calendar, and more.</div>
