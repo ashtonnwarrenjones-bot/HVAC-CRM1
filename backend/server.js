@@ -106,7 +106,7 @@ app.delete('/api/admin/wipe-all-data', async (req, res) => {
     return res.status(403).json({ error: 'forbidden' });
   }
   try {
-    await db.query(`
+    await db.pool.query(`
       TRUNCATE TABLE
         time_entries, crew_members, invoice_items, invoices,
         estimate_items, estimates, job_photos, job_tasks, jobs,
