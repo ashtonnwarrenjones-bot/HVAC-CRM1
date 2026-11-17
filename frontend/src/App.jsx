@@ -352,7 +352,8 @@ function AppLayout() {
       {/* ── Sidebar ── */}
       <nav className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-logo">
-          <Logo size={28} variant="white" subtitle={null} />
+          <div className="logo-icon"><Logo size={26} variant="white" subtitle={null} /></div>
+          <span className="logo-text nav-label">Mahalo Pro</span>
         </div>
 
         <div className="sidebar-nav">
@@ -365,7 +366,8 @@ function AppLayout() {
               className={({ isActive }) => isActive ? 'active' : ''}
               onClick={closeMenu}
             >
-              <span className="nav-icon"><Icon size={18} /></span>
+              <span className="nav-icon"><Icon size={17} /></span>
+              <span className="nav-label">{label}</span>
             </NavLink>
           ))}
         </div>
@@ -379,17 +381,19 @@ function AppLayout() {
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,.08)' }}>
           <a href="/portal" target="_blank" rel="noopener noreferrer" title="Customer Portal" onClick={closeMenu}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '11px 0', color: 'rgba(255,255,255,.42)', textDecoration: 'none', transition: 'color .15s' }}
+            style={{ display: 'flex', alignItems: 'center', color: 'rgba(255,255,255,.42)', textDecoration: 'none', transition: 'color .15s', borderRadius: 7, margin: '2px 6px', overflow: 'hidden' }}
             onMouseEnter={e => e.currentTarget.style.color='rgba(255,255,255,.8)'}
             onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,.42)'}
           >
-            <Globe size={18} />
+            <span className="nav-icon"><Globe size={17} /></span>
+            <span className="nav-label">Customer Portal</span>
           </a>
           <NavLink to="/settings" title="Settings" onClick={closeMenu}
             className={({ isActive }) => isActive ? 'active' : ''}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '11px 0', color: 'rgba(255,255,255,.42)', textDecoration: 'none', borderRadius: 7, margin: '0 6px 4px' }}
+            style={{ display: 'flex', alignItems: 'center', color: 'rgba(255,255,255,.42)', textDecoration: 'none', borderRadius: 7, margin: '2px 6px', overflow: 'hidden' }}
           >
-            <SettingsIcon size={18} />
+            <span className="nav-icon"><SettingsIcon size={17} /></span>
+            <span className="nav-label">Settings</span>
           </NavLink>
         </div>
 
