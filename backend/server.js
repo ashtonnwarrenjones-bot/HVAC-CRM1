@@ -46,7 +46,7 @@ app.use('/api/attachments', requireAuth, demoGuard, require('./routes/attachment
 app.use('/api/notifications', requireAuth, require('./routes/notifications'));
 app.use('/api/users', requireAuth, demoGuard, require('./routes/users'));
 app.use('/api/photos', requireAuth, demoGuard, require('./routes/photos'));
-app.use('/api/import/lmn/fetch-and-import', require('./routes/import'))
+app.use('/api/import-lmn-public', require('./routes/lmn-public'))
 app.use('/api/import', requireAuth, demoGuard, require('./routes/import'));
 app.use('/api/equipment', requireAuth, demoGuard, require('./routes/equipment'));
 app.use('/api/invoices', requireAuth, demoGuard, require('./routes/invoices'));
