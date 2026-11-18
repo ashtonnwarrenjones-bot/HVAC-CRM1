@@ -57,10 +57,29 @@ const ALL_NAV = [
       { to: '/proposals', label: 'Proposals' },
     ]
   },
-  { to: '/schedule', label: 'Schedule', Icon: Calendar, roles: ['admin', 'dispatcher', 'demo'] },
-  { to: '/invoices', label: 'Invoices', Icon: Receipt, roles: ['admin', 'dispatcher', 'demo'] },
+  {
+    group: 'schedule', label: 'Schedule', Icon: Calendar, roles: ['admin', 'dispatcher', 'demo'],
+    children: [
+      { to: '/schedule', label: 'Calendar' },
+      { to: '/dispatch', label: 'Dispatch Board' },
+      { to: '/service-requests', label: 'Service Requests' },
+    ]
+  },
+  {
+    group: 'invoices', label: 'Invoices', Icon: Receipt, roles: ['admin', 'dispatcher', 'demo'],
+    children: [
+      { to: '/invoices', label: 'Invoice List' },
+      { to: '/memberships', label: 'Memberships' },
+    ]
+  },
   { to: '/timesheets', label: 'Timesheets', Icon: UserCheck, roles: ['admin', 'dispatcher'] },
-  { to: '/pricebook', label: 'Pricebook', Icon: BookOpen, roles: ['admin', 'demo'] },
+  {
+    group: 'pricebook', label: 'Pricebook', Icon: BookOpen, roles: ['admin', 'demo'],
+    children: [
+      { to: '/pricebook', label: 'Price List' },
+      { to: '/vendors', label: 'Vendors' },
+    ]
+  },
   { to: '/import', label: 'Import', Icon: FileUp, roles: ['admin'] },
   { to: '/analytics', label: 'Analytics', Icon: BarChart2, roles: ['admin', 'sales_rep', 'demo'] },
 ];
@@ -283,7 +302,7 @@ function AppLayout() {
   const { token, username, logout, isDemo, role } = useAuth();
   const NAV = ALL_NAV.filter(item => item.roles.includes(role || 'admin'));
   const location = useLocation();
-  const [expandedGroups, setExpandedGroups] = useState(['clients', 'estimates']);
+  const [expandedGroups, setExpandedGroups] = useState([]);
   function toggleGroup(g) { setExpandedGroups(p => p.includes(g) ? p.filter(x => x !== g) : [...p, g]); }
   const [menuOpen, setMenuOpen]   = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
