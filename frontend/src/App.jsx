@@ -50,7 +50,13 @@ const ALL_NAV = [
       { to: '/contacts', label: 'Contacts' },
     ]
   },
-  { to: '/estimates', label: 'Estimates', Icon: ClipboardList, roles: ['admin', 'sales_rep', 'demo'] },
+  {
+    group: 'estimates', label: 'Estimates', Icon: ClipboardList, roles: ['admin', 'sales_rep', 'demo'],
+    children: [
+      { to: '/estimates', label: 'Estimate List' },
+      { to: '/proposals', label: 'Proposals' },
+    ]
+  },
   { to: '/schedule', label: 'Schedule', Icon: Calendar, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/invoices', label: 'Invoices', Icon: Receipt, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/timesheets', label: 'Timesheets', Icon: UserCheck, roles: ['admin', 'dispatcher'] },
@@ -277,7 +283,7 @@ function AppLayout() {
   const { token, username, logout, isDemo, role } = useAuth();
   const NAV = ALL_NAV.filter(item => item.roles.includes(role || 'admin'));
   const location = useLocation();
-  const [expandedGroups, setExpandedGroups] = useState(['clients']);
+  const [expandedGroups, setExpandedGroups] = useState(['clients', 'estimates']);
   function toggleGroup(g) { setExpandedGroups(p => p.includes(g) ? p.filter(x => x !== g) : [...p, g]); }
   const [menuOpen, setMenuOpen]   = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
