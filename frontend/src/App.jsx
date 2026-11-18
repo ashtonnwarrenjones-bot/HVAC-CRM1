@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Logo from './components/Logo';
 import axios from 'axios';
@@ -8,7 +8,7 @@ import {
   FileText, BarChart2, Settings as SettingsIcon, Globe,
   Bell, LogOut, Menu, X, CheckCircle, Clock, Trash2,
   Search, Wrench, Receipt, Command, Sun, Moon,
-  BookOpen, Shield, Trello, Truck, FileUp, ClipboardList, UserCheck
+  BookOpen, Shield, Trello, Truck, FileUp, ClipboardList, UserCheck, ChevronDown
 } from 'lucide-react';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
@@ -43,8 +43,13 @@ import Timesheets from './pages/Timesheets';
 const ALL_NAV = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard, exact: true, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
   { to: '/my-jobs', label: 'My Jobs', Icon: Wrench, roles: ['technician'] },
-  { to: '/companies', label: 'Clients', Icon: Building2, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
-  { to: '/contacts', label: 'Contacts', Icon: Users, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'] },
+  {
+    group: 'clients', label: 'Clients', Icon: Building2, roles: ['admin', 'sales_rep', 'dispatcher', 'demo'],
+    children: [
+      { to: '/companies', label: 'Client List' },
+      { to: '/contacts', label: 'Contacts' },
+    ]
+  },
   { to: '/estimates', label: 'Estimates', Icon: ClipboardList, roles: ['admin', 'sales_rep', 'demo'] },
   { to: '/schedule', label: 'Schedule', Icon: Calendar, roles: ['admin', 'dispatcher', 'demo'] },
   { to: '/invoices', label: 'Invoices', Icon: Receipt, roles: ['admin', 'dispatcher', 'demo'] },
@@ -271,6 +276,9 @@ function NotificationsPanel({ onClose }) {
 function AppLayout() {
   const { token, username, logout, isDemo, role } = useAuth();
   const NAV = ALL_NAV.filter(item => item.roles.includes(role || 'admin'));
+  const location = useLocation();
+  const [expandedGroups, setExpandedGroups] = useState(['clients']);
+  function toggleGroup(g) { setExpandedGroups(p => p.includes(g) ? p.filter(x => x !== g) : [...p, g]); }
   const [menuOpen, setMenuOpen]   = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -352,24 +360,55 @@ function AppLayout() {
       {/* ── Sidebar ── */}
       <nav className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-logo">
-          <div className="logo-icon"><Logo size={26} variant="white" subtitle={null} /></div>
+          <div className="logo-icon"><Logo size={26} variant="white" subtitle={null} showWordmark={false} /></div>
           <span className="logo-text nav-label">Mahalo Pro</span>
         </div>
 
         <div className="sidebar-nav">
-          {NAV.map(({ to, label, Icon, exact }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={exact}
-              title={label}
-              className={({ isActive }) => isActive ? 'active' : ''}
-              onClick={closeMenu}
-            >
-              <span className="nav-icon"><Icon size={17} /></span>
-              <span className="nav-label">{label}</span>
-            </NavLink>
-          ))}
+          {NAV.map((item) => {
+            if (item.children) {
+              const isOpen = expandedGroups.includes(item.group);
+              const isGroupActive = item.children.some(c => location.pathname.startsWith(c.to));
+              return (
+                <div key={item.group} className="nav-group">
+                  <button
+                    className={`nav-group-trigger${isGroupActive ? ' active' : ''}`}
+                    onClick={() => toggleGroup(item.group)}
+                  >
+                    <span className="nav-icon"><item.Icon size={17} /></span>
+                    <span className="nav-label">{item.label}</span>
+                    <ChevronDown size={13} className={`nav-chevron${isOpen ? ' open' : ''}`} />
+                  </button>
+                  {isOpen && (
+                    <div className="nav-sub">
+                      {item.children.map(child => (
+                        <NavLink key={child.to} to={child.to}
+                          className={({ isActive }) => isActive ? 'active' : ''}
+                          onClick={closeMenu}
+                        >
+                          <span className="nav-sub-dot" />
+                          <span className="nav-label">{child.label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.exact}
+                title={item.label}
+                className={({ isActive }) => isActive ? 'active' : ''}
+                onClick={closeMenu}
+              >
+                <span className="nav-icon"><item.Icon size={17} /></span>
+                <span className="nav-label">{item.label}</span>
+              </NavLink>
+            );
+          })}
         </div>
 
         {/* Tour launch button — demo mode only */}
